@@ -3,8 +3,19 @@
 An interactive visualisation of tire manufacturing, built for APS / MRP demonstrations,
 Theory of Constraints workshops, Supply Planning explanations, employee training and conferences.
 
-This is not a website. It is a deterministic production simulation with a semi-isometric
-SVG shop floor rendered at 60 fps.
+This is not a website. It is a deterministic production simulation with a shop floor rendered
+at 60 fps.
+
+- **UI language:** Russian (Онлайн / Сравнение / Презентация / Анатомия / Материалы).
+- **Design system:** In.Plan — Open Sans, brand purple `#9000FF` on a `#F5F6F8` canvas, flat
+  4 px / 8 px radii, the In.Plan icon set and the white `in.plan` wordmark. Tokens live in
+  `tailwind.config.js`, `src/core/constants.ts`, `src/styles/index.css` and
+  `src/components/ui/icons.tsx`.
+- **Imagery:** realistic PNG renders for the machines, tires and buffer/warehouse racks
+  (`src/assets/img/`), extracted from the reference sheets in `../../uploads/`. State
+  (idle/working/blocked/…) is conveyed by the card frame, meters and TOC greyscale, not by
+  redrawing the equipment. The unvulcanised "green" tire is drawn **black and smooth**
+  (no tread); the cured tire is **black with tread**.
 
 ## Quick start
 
@@ -36,7 +47,7 @@ npm run check    # typecheck + model verification + headless render smoke test
 `npm run verify` runs the model headlessly and asserts the core narrative:
 
 ```
-baseline (4 presses)    thr  16.0/h  cycle  115m  wip 52  queue 39  press 100%  bottleneck Vulcanization
+baseline (4 presses)    thr  16.0/h  cycle  115m  wip 52  queue 39  press 100%  bottleneck Вулканизация
 optimised (8 presses)   thr  24.0/h  cycle   41m  wip 17  queue  0  press  78%  bottleneck —
 ```
 
@@ -133,7 +144,9 @@ and timeline scrubbing is coalesced to one replay per animation frame.
 * No native `<button>`, `<input type="range">` or `<select>`; all interaction goes
   through the `Pressable`, `RangeControl` and `Segmented` primitives with keyboard support
   (arrows, Home/End, PageUp/PageDown) and correct ARIA roles.
-* No raster assets — all ten machines are inline animated SVG.
+* The shop-floor layout, animation and state logic are SVG; the equipment/tire artwork was
+  later swapped to realistic PNGs (see *Imagery* above). Original hand-drawn SVG machines
+  remain in `src/components/machines/` as the fallback renderer for kinds without a photo.
 * Every file stays below 300 lines; all parameters flow through React Context.
 * All constants live in `src/core/constants.ts`.
 
@@ -154,3 +167,48 @@ The smoke test also asserts that no native `<button>` or `<input>` element ever 
 * Scenario-driven configuration (`tire-factory.json`) — ready for DRP and other industries.
 * Production orders and release policy are modelled (`releaseIntervalMinutes`, `batchSize`).
 * Deterministic replay makes state export and scenario diffing straightforward.
+
+## Working notes for a new session
+
+**Where things are.** The session usually opens at `…/Git/tyres`, but this app is the nested
+folder `tyres app/outputs/`. **That `outputs/` folder is the git repo root** (GitHub
+`igordikinov/tyres`, private). Run every `npm` / `git` command from there. The sibling
+`tyres app/` contains non-repo files (`audit.jsonl`, `.claude/.credentials.json`, `.audit-key`) —
+never commit those.
+
+**Running it.**
+
+```bash
+cd "tyres app/outputs"
+npm install          # first time (Node 20+, npm)
+npm run dev -- --port 5173 --host
+```
+
+Or use the browser preview: `.claude/launch.json` (at the session root) defines `tyres-dev`
+(5173) and `tyres-preview` (4173), then call `preview_start` with that name. The config uses
+Windows **8.3 short paths** (`C:/PROGRA~1/nodejs/npm.cmd`, `…/TYRESA~1/outputs`) because the
+launch runner chokes on the spaces/Cyrillic in the real paths. After changing
+`tailwind.config.js`, **restart the dev server** — HMR doesn't pick up Tailwind config changes.
+
+**Verifying UI changes.** The in-app Browser pane often won't composite: screenshots time out
+and the rAF loop is throttled so the sim clock stays frozen. Don't depend on screenshots —
+read the DOM via `read_page` / `get_page_text` / `javascript_tool` and check computed styles.
+To populate live state without playback, click the timeline slider (role `slider`,
+"Таймлайн симуляции") to `seek()` to a mid-shift time.
+
+**Design system & assets.** In.Plan tokens were imported from a Claude Design project via the
+**DesignSync** MCP tool (project `In.Plan Design System`, id `0a4cef78-5df6-4fd2-bc6c-d78cf7f52bbb`).
+The realistic PNGs in `src/assets/img/` were sliced from `../../uploads/` reference sheets with
+`sharp` (installed transiently: `npm install --no-save sharp`), keying white → transparent and
+trimming tight. Don't re-touch those PNGs unless asked.
+
+## Deployment
+
+GitHub Pages via GitHub Actions (`.github/workflows/deploy.yml`): every push to `main` runs
+`npm ci && npm run build` and publishes `dist/`. `vite.config.ts` sets `base: '/tyres/'` for
+production builds only (dev stays at `/`). Target URL: **https://igordikinov.github.io/tyres/**.
+
+> Free GitHub Pages serves **public** repos only. While `igordikinov/tyres` is private the
+> deploy will not publish — make the repo public (Settings → General → Change visibility) or
+> use GitHub Pro. Alternatives that work with private repos: Vercel / Netlify / Cloudflare Pages
+> (connect the repo; `base` can go back to `/`).
