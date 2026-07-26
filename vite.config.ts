@@ -2,7 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath, URL } from 'node:url';
 
-export default defineConfig({
+// Project is served from https://igordikinov.github.io/tyres/ on GitHub Pages,
+// so the production build needs the /tyres/ base; local dev stays at /.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/tyres/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -14,4 +17,4 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
   },
-});
+}));
