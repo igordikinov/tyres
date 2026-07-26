@@ -1,0 +1,78 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-surface text-ink-900 font-sans antialiased;
+    margin: 0;
+    overflow: hidden;
+  }
+
+  /* Every control in this application is a custom component. */
+  [role='button'],
+  [role='slider'],
+  [role='switch'],
+  [role='radio'],
+  [role='tab'] {
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    outline: none;
+  }
+
+  /* Only sliders swallow touch gestures; everything else stays scrollable. */
+  [role='slider'] {
+    touch-action: none;
+  }
+
+  [role='button']:focus-visible,
+  [role='slider']:focus-visible,
+  [role='switch']:focus-visible,
+  [role='radio']:focus-visible,
+  [role='tab']:focus-visible {
+    box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #9000ff;
+  }
+}
+
+@layer components {
+  .label-caps {
+    @apply text-[10px] font-semibold uppercase tracking-label text-ink-400;
+  }
+
+  .numeric {
+    @apply font-mono tabular-nums;
+  }
+
+  .surface-card {
+    @apply rounded-xl2 border border-line bg-surface shadow-card;
+  }
+
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d9d9d9 transparent;
+  }
+
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: #d9d9d9;
+    border-radius: 999px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

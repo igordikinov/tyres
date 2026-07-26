@@ -1,0 +1,199 @@
+/**
+ * Domain-agnostic factory model.
+ *
+ * A scenario describes a Factory as Resources, Buffers, Routes, Orders and
+ * Events. Tire manufacturing is only one scenario file — swapping the JSON
+ * is enough to visualise beverages, steel, pharma or FMCG.
+ */
+
+export type NodeKind = 'source' | 'process' | 'buffer' | 'sink';
+
+/** Key of the SVG renderer used to draw a node. */
+export type MachineKind =
+  | 'raw'
+  | 'mixer'
+  | 'extruder'
+  | 'calender'
+  | 'bead'
+  | 'assembly'
+  | 'buffer'
+  | 'press'
+  | 'inspection'
+  | 'warehouse';
+
+export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved';
+
+/** Tunable parameters exposed through the Parameter Panel. */
+export type ParamKey =
+  | 'mixerTime'
+  | 'extruderTime'
+  | 'assemblyTime'
+  | 'pressTime'
+  | 'inspectionTime'
+  | 'pressCount'
+  | 'batchSize'
+  | 'bufferCapacity';
+
+export type Params = Record<ParamKey, number>;
+
+export interface ParamDef {
+  key: ParamKey;
+  label: string;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  group: 'time' | 'capacity';
+  hint: string;
+}
+
+export interface NodeDef {
+  id: string;
+  /** 01..10 badge shown on the canvas. */
+  index: number;
+  name: string;
+  subtitle: string;
+  kind: NodeKind;
+  machine: MachineKind;
+  /** Minutes of service per unit. Buffers, sources and sinks use 0. */
+  processMinutes: number;
+  /** Parallel servers (e.g. 4 vulcanisation presses). */
+  capacity: number;
+  /** Units that may wait in front of the node. */
+  queueCapacity: number;
+  /** Travel time towards `next`, in simulated minutes. */
+  transportMinutes: number;
+  next: string | null;
+  /** Canvas coordinates in scenario viewBox units. */
+  x: number;
+  y: number;
+  /** +1 when material flows to the right, -1 when it flows to the left. */
+  dir: 1 | -1;
+  /** Queue rendered as a grid rack rather than a single file. */
+  rackColumns?: number;
+  /** Parameter that drives `processMinutes`. */
+  timeParam?: ParamKey;
+  /** Parameter that drives `capacity`. */
+  capacityParam?: ParamKey;
+  /** Parameter that drives `queueCapacity`. */
+  queueParam?: ParamKey;
+  /** Units leaving this node change appearance (green tire → cured tire). */
+  transformsAppearance?: boolean;
+  narration?: string;
+}
+
+/** One structural element of the finished product. */
+export interface ConstructionPart {
+  id: string;
+  index: number;
+  name: string;
+  role: string;
+  detail: string;
+  color: string;
+}
+
+/** One step of the layer-by-layer build on the assembly drum. */
+export interface AssemblyLayer {
+  id: string;
+  step: number;
+  name: string;
+  caption: string;
+}
+
+/** A raw material consumed by the line. */
+export interface MaterialDef {
+  id: string;
+  name: string;
+  purpose: string;
+  /** Share of the compound, in percent. */
+  share: number;
+  /** Node that consumes it. */
+  stage: string;
+  color: string;
+}
+
+export interface CuringSpec {
+  temperatureC: [number, number];
+  pressureBar: [number, number];
+}
+
+export interface ScenarioDef {
+  id: string;
+  name: string;
+  product: string;
+  unitLabel: string;
+  /** Minutes between two consecutive releases of one batch. */
+  releaseIntervalMinutes: number;
+  canvas: { width: number; height: number };
+  nodes: NodeDef[];
+  params: Params;
+  paramDefs: ParamDef[];
+  /** Alternative parameter set used by Compare Mode as the "after" case. */
+  optimisedParams: Partial<Params>;
+  /** Anatomy of the product, shown by the Anatomy tab. */
+  construction: ConstructionPart[];
+  /** Build sequence on the assembly drum. */
+  assemblyLayers: AssemblyLayer[];
+  /** Raw materials consumed by the line. */
+  materials: MaterialDef[];
+  curing: CuringSpec;
+}
+
+export interface UnitView {
+  id: number;
+  /** Node the unit belongs to (target node while moving). */
+  nodeId: string;
+  fromNodeId: string | null;
+  phase: 'queued' | 'service' | 'moving' | 'done';
+  /** 0..1 within the current phase. */
+  progress: number;
+  queueIndex: number;
+  slotIndex: number;
+  createdAt: number;
+}
+
+export interface NodeView {
+  id: string;
+  state: ResourceState;
+  queueLength: number;
+  queueCapacity: number;
+  inService: number;
+  capacity: number;
+  /** Physical server slots currently drawn, including ones draining after a cut. */
+  slotCount: number;
+  utilization: number;
+  wip: number;
+  processed: number;
+  processMinutes: number;
+  isBottleneck: boolean;
+}
+
+export interface Kpi {
+  throughput: number;
+  cycleTimeMinutes: number;
+  wip: number;
+  queue: number;
+  utilization: number;
+  bottleneckId: string | null;
+  bottleneckName: string;
+  bottleneckUtilization: number;
+  completed: number;
+  released: number;
+}
+
+export interface HistoryPoint {
+  t: number;
+  throughput: number;
+  wip: number;
+  queue: number;
+}
+
+export interface Snapshot {
+  time: number;
+  units: UnitView[];
+  nodes: Record<string, NodeView>;
+  kpi: Kpi;
+  history: HistoryPoint[];
+  narration: string;
+  narrationAt: number;
+}

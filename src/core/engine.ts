@@ -1,0 +1,300 @@
+import {
+  HISTORY_INTERVAL_MINUTES,
+  HISTORY_MAX_POINTS,
+  TICK_EPSILON,
+  TICK_MINUTES,
+  UTILIZATION_TAU_MINUTES,
+} from './constants';
+import { throughputPerHour } from './metrics';
+import { Narrator } from './narrator';
+import {
+  countQueued,
+  countWip,
+  createNodeRuntime,
+  type EngineState,
+  type NodeRuntime,
+  type Unit,
+} from './runtime';
+import { buildSnapshot } from './snapshot';
+import type { Params, ScenarioDef, Snapshot } from './types';
+
+/**
+ * Deterministic, fixed-step factory simulation.
+ *
+ * The engine knows nothing about tires: it moves units through Resources,
+ * Buffers and Routes described by a scenario. Determinism lets the timeline
+ * rewind by replaying from t = 0.
+ */
+export class FactoryEngine {
+  readonly scenario: ScenarioDef;
+  private params: Params;
+  private state: EngineState;
+  private order: string[] = [];
+  private nextUnitId = 1;
+  private pendingRelease = 0;
+  private nextReleaseAt = 0;
+  private nextHistoryAt = 0;
+  private readonly narrator: Narrator;
+  /** Whole ticks executed so far; the clock is derived from this integer. */
+  private ticks = 0;
+  /** Total minutes requested, so partial frames accumulate without drift. */
+  private requestedMinutes = 0;
+
+  constructor(scenario: ScenarioDef, params: Params) {
+    this.scenario = scenario;
+    this.params = { ...params };
+    this.narrator = new Narrator(scenario);
+    this.state = this.createState();
+    this.reset();
+  }
+
+  get time(): number {
+    return this.state.time;
+  }
+
+  private createState(): EngineState {
+    return {
+      scenario: this.scenario,
+      time: 0,
+      nodes: new Map<string, NodeRuntime>(),
+      units: new Map<number, Unit>(),
+      completionTimes: [],
+      leadTimes: [],
+      completed: 0,
+      released: 0,
+      history: [],
+      narration: '',
+      narrationAt: 0,
+    };
+  }
+
+  reset(): void {
+    this.state = this.createState();
+    this.order = this.scenario.nodes.map((node) => node.id);
+    for (const def of this.scenario.nodes) {
+      this.state.nodes.set(def.id, createNodeRuntime(def));
+    }
+    this.nextUnitId = 1;
+    this.pendingRelease = 0;
+    this.nextReleaseAt = 0;
+    this.nextHistoryAt = 0;
+    this.narrator.reset();
+    this.ticks = 0;
+    this.requestedMinutes = 0;
+    this.applyParams(this.params);
+  }
+
+  getParams(): Params {
+    return { ...this.params };
+  }
+
+  /** Applies tunables to the running model without discarding current state. */
+  applyParams(params: Params): void {
+    this.params = { ...params };
+    for (const node of this.state.nodes.values()) {
+      const { timeParam, capacityParam, queueParam } = node.def;
+      if (timeParam) node.processMinutes = Math.max(this.params[timeParam], TICK_MINUTES);
+      if (queueParam) node.queueCapacity = Math.round(this.params[queueParam]);
+      if (capacityParam) {
+        node.capacity = Math.max(1, Math.round(this.params[capacityParam]));
+        while (node.slots.length < node.capacity) node.slots.push(null);
+        while (node.slots.length > node.capacity && node.slots[node.slots.length - 1] === null) {
+          node.slots.pop();
+        }
+      }
+    }
+  }
+
+  /** Rebuilds the run from t = 0 up to `target`, used by the timeline. */
+  seek(target: number): void {
+    this.reset();
+    this.advance(Math.max(0, target));
+  }
+
+  /**
+   * Advances the clock in whole ticks only. The fractional remainder of a
+   * browser frame is carried over, which keeps a live run bit-identical to a
+   * replay produced by `seek()`.
+   */
+  advance(minutes: number): void {
+    if (!(minutes > 0)) return;
+    this.requestedMinutes += minutes;
+    const target = Math.floor(this.requestedMinutes / TICK_MINUTES + TICK_EPSILON);
+    while (this.ticks < target) {
+      this.ticks += 1;
+      this.tick(TICK_MINUTES);
+    }
+  }
+
+  getSnapshot(): Snapshot {
+    return buildSnapshot(this.state);
+  }
+
+  private tick(dt: number): void {
+    // Derived from the integer tick count so the clock cannot drift.
+    this.state.time = this.ticks * TICK_MINUTES;
+    this.updateMovers(dt);
+    for (let i = this.order.length - 1; i >= 0; i -= 1) {
+      this.updateNode(this.state.nodes.get(this.order[i])!, dt);
+    }
+    this.release();
+    this.recordHistory();
+  }
+
+  private updateMovers(dt: number): void {
+    for (const unit of this.state.units.values()) {
+      if (unit.phase !== 'moving') continue;
+      unit.elapsed += dt;
+      if (unit.elapsed < unit.duration) continue;
+      const target = this.state.nodes.get(unit.nodeId)!;
+      target.reserved = Math.max(0, target.reserved - 1);
+      unit.elapsed = 0;
+      if (target.def.kind === 'sink') {
+        unit.phase = 'done';
+        this.state.completed += 1;
+        this.state.completionTimes.push(this.state.time);
+        this.state.leadTimes.push(this.state.time - unit.createdAt);
+        this.narrator.announce(target.def, this.state.time, this.state);
+        this.state.units.delete(unit.id);
+      } else {
+        unit.phase = 'queued';
+        target.queue.push(unit.id);
+      }
+    }
+  }
+
+  private updateNode(node: NodeRuntime, dt: number): void {
+    const kind = node.def.kind;
+    if (kind === 'source' || kind === 'sink') return;
+    if (kind === 'buffer') {
+      this.updateBuffer(node, dt);
+      return;
+    }
+
+    let working = 0;
+    let blocked = 0;
+    for (let slot = 0; slot < node.slots.length; slot += 1) {
+      const unitId = node.slots[slot];
+      if (unitId === null) continue;
+      const unit = this.state.units.get(unitId)!;
+      const wasDone = unit.elapsed >= unit.duration;
+      if (!wasDone) {
+        unit.elapsed = Math.min(unit.duration, unit.elapsed + dt);
+        working += 1;
+      }
+      if (unit.elapsed >= unit.duration) {
+        if (this.tryDepart(node, unitId)) {
+          node.slots[slot] = null;
+          node.processed += 1;
+        } else if (wasDone) {
+          blocked += 1;
+        }
+      }
+    }
+    for (let slot = 0; slot < node.capacity && slot < node.slots.length; slot += 1) {
+      if (node.slots[slot] !== null) continue;
+      const unitId = node.queue.shift();
+      if (unitId === undefined) break;
+      const unit = this.state.units.get(unitId)!;
+      unit.phase = 'service';
+      unit.slotIndex = slot;
+      unit.elapsed = 0;
+      unit.duration = node.processMinutes;
+      node.slots[slot] = unitId;
+      working += 1;
+    }
+    this.trackUtilization(node, working, dt);
+    // Idle: nothing to do right now but material is already on its way.
+    // Starved: the upstream route has run dry.
+    const awaiting = node.queue.length > 0 || node.reserved > 0;
+    node.state =
+      blocked > 0 ? 'blocked' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
+  }
+
+  private updateBuffer(node: NodeRuntime, dt: number): void {
+    const next = node.def.next ? this.state.nodes.get(node.def.next)! : null;
+    while (node.queue.length > 0 && next && this.hasRoom(next)) {
+      this.startMove(node, next, node.queue.shift()!);
+      this.narrator.announce(node.def, this.state.time, this.state);
+    }
+    const full = node.queue.length >= node.queueCapacity;
+    node.state = node.queue.length === 0 ? 'starved' : full ? 'blocked' : 'idle';
+    this.trackUtilization(node, node.queue.length > 0 ? 1 : 0, dt);
+  }
+
+  private trackUtilization(node: NodeRuntime, working: number, dt: number): void {
+    // While extra servers drain after a capacity cut, they still count.
+    const servers = Math.max(node.capacity, node.slots.length);
+    const instant = servers > 0 ? Math.min(working / servers, 1) : 0;
+    const alpha = Math.min(dt / UTILIZATION_TAU_MINUTES, 1);
+    node.utilization += (instant - node.utilization) * alpha;
+  }
+
+  private release(): void {
+    const source = this.state.nodes.get(this.order[0])!;
+    const target = source.def.next ? this.state.nodes.get(source.def.next)! : null;
+    if (!target) return;
+    const batch = Math.max(1, Math.round(this.params.batchSize));
+    if (this.state.time >= this.nextReleaseAt) {
+      this.pendingRelease += batch;
+      this.nextReleaseAt = this.state.time + this.scenario.releaseIntervalMinutes * batch;
+    }
+    while (this.pendingRelease > 0 && this.hasRoom(target)) {
+      const unit: Unit = {
+        id: this.nextUnitId++,
+        createdAt: this.state.time,
+        nodeId: target.def.id,
+        fromNodeId: source.def.id,
+        phase: 'moving',
+        elapsed: 0,
+        duration: Math.max(source.def.transportMinutes, TICK_MINUTES),
+        slotIndex: 0,
+      };
+      this.state.units.set(unit.id, unit);
+      target.reserved += 1;
+      this.pendingRelease -= 1;
+      this.state.released += 1;
+      this.narrator.announce(source.def, this.state.time, this.state);
+    }
+    source.state = this.pendingRelease > 0 ? 'blocked' : 'working';
+  }
+
+  private hasRoom(node: NodeRuntime): boolean {
+    if (node.def.kind === 'sink') return true;
+    return node.queue.length + node.reserved < node.queueCapacity;
+  }
+
+  private tryDepart(node: NodeRuntime, unitId: number): boolean {
+    const next = node.def.next ? this.state.nodes.get(node.def.next)! : null;
+    if (!next || !this.hasRoom(next)) return false;
+    this.startMove(node, next, unitId);
+    this.narrator.announce(node.def, this.state.time, this.state);
+    return true;
+  }
+
+  private startMove(from: NodeRuntime, to: NodeRuntime, unitId: number): void {
+    const unit = this.state.units.get(unitId)!;
+    unit.phase = 'moving';
+    unit.fromNodeId = from.def.id;
+    unit.nodeId = to.def.id;
+    unit.elapsed = 0;
+    unit.duration = Math.max(from.def.transportMinutes, TICK_MINUTES);
+    to.reserved += 1;
+  }
+
+  private recordHistory(): void {
+    while (this.state.time >= this.nextHistoryAt) {
+      this.state.history.push({
+        t: this.nextHistoryAt,
+        throughput: throughputPerHour(
+          this.state.completionTimes,
+          Math.max(this.state.time, TICK_MINUTES),
+        ),
+        wip: countWip(this.state.units),
+        queue: countQueued(this.state.nodes),
+      });
+      if (this.state.history.length > HISTORY_MAX_POINTS) this.state.history.shift();
+      this.nextHistoryAt += HISTORY_INTERVAL_MINUTES;
+    }
+  }
+}

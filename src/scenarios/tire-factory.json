@@ -1,0 +1,461 @@
+{
+  "id": "tire-factory",
+  "name": "Производство шин",
+  "product": "Легковая радиальная 205/55 R16",
+  "unitLabel": "шина",
+  "releaseIntervalMinutes": 2.4,
+  "canvas": {
+    "width": 1520,
+    "height": 880
+  },
+  "params": {
+    "mixerTime": 3,
+    "extruderTime": 2.5,
+    "assemblyTime": 2,
+    "pressTime": 15,
+    "inspectionTime": 1.5,
+    "pressCount": 4,
+    "batchSize": 1,
+    "bufferCapacity": 40
+  },
+  "optimisedParams": {
+    "pressCount": 8,
+    "pressTime": 13,
+    "bufferCapacity": 24
+  },
+  "paramDefs": [
+    {
+      "key": "mixerTime",
+      "label": "Время смешивания",
+      "unit": "мин",
+      "min": 1,
+      "max": 8,
+      "step": 0.5,
+      "group": "time",
+      "hint": "Цикл смешивания партии в резиносмесителе"
+    },
+    {
+      "key": "extruderTime",
+      "label": "Время экструзии",
+      "unit": "мин",
+      "min": 1,
+      "max": 8,
+      "step": 0.5,
+      "group": "time",
+      "hint": "Цикл экструзии протектора и боковины"
+    },
+    {
+      "key": "assemblyTime",
+      "label": "Время сборки",
+      "unit": "мин",
+      "min": 1,
+      "max": 6,
+      "step": 0.5,
+      "group": "time",
+      "hint": "Цикл сборки зелёной шины на барабане"
+    },
+    {
+      "key": "pressTime",
+      "label": "Время прессования",
+      "unit": "мин",
+      "min": 5,
+      "max": 25,
+      "step": 0.5,
+      "group": "time",
+      "hint": "Цикл вулканизации одного пресса"
+    },
+    {
+      "key": "inspectionTime",
+      "label": "Время контроля",
+      "unit": "мин",
+      "min": 0.5,
+      "max": 5,
+      "step": 0.5,
+      "group": "time",
+      "hint": "Цикл контроля однородности и рентгена"
+    },
+    {
+      "key": "pressCount",
+      "label": "Прессы",
+      "unit": "шт",
+      "min": 1,
+      "max": 12,
+      "step": 1,
+      "group": "capacity",
+      "hint": "Число параллельных прессов вулканизации"
+    },
+    {
+      "key": "batchSize",
+      "label": "Размер партии",
+      "unit": "шт",
+      "min": 1,
+      "max": 8,
+      "step": 1,
+      "group": "capacity",
+      "hint": "Число шин, запускаемых в линию за один вызов материала"
+    },
+    {
+      "key": "bufferCapacity",
+      "label": "Размер буфера",
+      "unit": "шт",
+      "min": 8,
+      "max": 64,
+      "step": 4,
+      "group": "capacity",
+      "hint": "Буфер зелёных шин перед прессами"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "raw",
+      "index": 1,
+      "name": "Сырьё",
+      "subtitle": "Приём смеси",
+      "kind": "source",
+      "machine": "raw",
+      "processMinutes": 0,
+      "capacity": 0,
+      "queueCapacity": 0,
+      "transportMinutes": 1.2,
+      "next": "mixer",
+      "x": 150,
+      "y": 240,
+      "dir": 1,
+      "narration": "Сырьё вызывается со склада."
+    },
+    {
+      "id": "mixer",
+      "index": 2,
+      "name": "Смеситель",
+      "subtitle": "Резиносмеситель",
+      "kind": "process",
+      "machine": "mixer",
+      "processMinutes": 3,
+      "capacity": 2,
+      "queueCapacity": 6,
+      "transportMinutes": 1.2,
+      "next": "extruder",
+      "x": 460,
+      "y": 240,
+      "dir": 1,
+      "timeParam": "mixerTime",
+      "narration": "Резина смешивается."
+    },
+    {
+      "id": "extruder",
+      "index": 3,
+      "name": "Экструдер",
+      "subtitle": "Протектор и боковина",
+      "kind": "process",
+      "machine": "extruder",
+      "processMinutes": 2.5,
+      "capacity": 2,
+      "queueCapacity": 6,
+      "transportMinutes": 1.2,
+      "next": "calender",
+      "x": 770,
+      "y": 240,
+      "dir": 1,
+      "timeParam": "extruderTime",
+      "narration": "Изготавливаются компоненты."
+    },
+    {
+      "id": "calender",
+      "index": 4,
+      "name": "Каландр",
+      "subtitle": "Обкладка металлокорда",
+      "kind": "process",
+      "machine": "calender",
+      "processMinutes": 2.5,
+      "capacity": 2,
+      "queueCapacity": 6,
+      "transportMinutes": 1.2,
+      "next": "bead",
+      "x": 1080,
+      "y": 240,
+      "dir": 1,
+      "narration": "Металлокорд обкладывается резиной на каландре."
+    },
+    {
+      "id": "bead",
+      "index": 5,
+      "name": "Борт",
+      "subtitle": "Формовка бортовых колец",
+      "kind": "process",
+      "machine": "bead",
+      "processMinutes": 2,
+      "capacity": 2,
+      "queueCapacity": 6,
+      "transportMinutes": 2.4,
+      "next": "assembly",
+      "x": 1390,
+      "y": 240,
+      "dir": 1,
+      "narration": "Бортовые кольца навиваются и обёртываются."
+    },
+    {
+      "id": "assembly",
+      "index": 6,
+      "name": "Сборка",
+      "subtitle": "Сборочный барабан",
+      "kind": "process",
+      "machine": "assembly",
+      "processMinutes": 2,
+      "capacity": 1,
+      "queueCapacity": 6,
+      "transportMinutes": 1.2,
+      "next": "greenBuffer",
+      "x": 1390,
+      "y": 640,
+      "dir": -1,
+      "timeParam": "assemblyTime",
+      "narration": "Собирается зелёная шина."
+    },
+    {
+      "id": "greenBuffer",
+      "index": 7,
+      "name": "Буфер зелёных шин",
+      "subtitle": "Буферный запас",
+      "kind": "buffer",
+      "machine": "buffer",
+      "processMinutes": 0,
+      "capacity": 0,
+      "queueCapacity": 40,
+      "transportMinutes": 1.2,
+      "next": "press",
+      "x": 1080,
+      "y": 640,
+      "dir": -1,
+      "rackColumns": 8,
+      "queueParam": "bufferCapacity",
+      "narration": "Зелёные шины ждут перед ограничением."
+    },
+    {
+      "id": "press",
+      "index": 8,
+      "name": "Вулканизация",
+      "subtitle": "Прессы вулканизации",
+      "kind": "process",
+      "machine": "press",
+      "processMinutes": 15,
+      "capacity": 4,
+      "queueCapacity": 6,
+      "transportMinutes": 1.2,
+      "next": "inspection",
+      "x": 770,
+      "y": 640,
+      "dir": -1,
+      "timeParam": "pressTime",
+      "capacityParam": "pressCount",
+      "transformsAppearance": true,
+      "narration": "Шина поступает на вулканизацию."
+    },
+    {
+      "id": "inspection",
+      "index": 9,
+      "name": "Контроль",
+      "subtitle": "Однородность и рентген",
+      "kind": "process",
+      "machine": "inspection",
+      "processMinutes": 1.5,
+      "capacity": 2,
+      "queueCapacity": 6,
+      "transportMinutes": 1.4,
+      "next": "warehouse",
+      "x": 460,
+      "y": 640,
+      "dir": -1,
+      "timeParam": "inspectionTime",
+      "narration": "Начинается контроль качества."
+    },
+    {
+      "id": "warehouse",
+      "index": 10,
+      "name": "Склад",
+      "subtitle": "Готовая продукция",
+      "kind": "sink",
+      "machine": "warehouse",
+      "processMinutes": 0,
+      "capacity": 0,
+      "queueCapacity": 0,
+      "transportMinutes": 0,
+      "next": null,
+      "x": 150,
+      "y": 640,
+      "dir": -1,
+      "narration": "Готовые шины складируются для отгрузки."
+    }
+  ],
+  "construction": [
+    {
+      "id": "tread",
+      "index": 1,
+      "name": "Протектор",
+      "role": "Сцепление, отвод воды и износостойкость",
+      "detail": "Смесь с высоким содержанием кремнезёма; рисунок формуется при вулканизации",
+      "color": "#1B2430"
+    },
+    {
+      "id": "belt",
+      "index": 2,
+      "name": "Брекер (металлокорд)",
+      "role": "Придаёт жёсткость короне и стабилизирует каркас",
+      "detail": "Два перекрёстных слоя латунированного металлокорда",
+      "color": "#B98A4A"
+    },
+    {
+      "id": "carcass",
+      "index": 3,
+      "name": "Каркас (текстильный корд)",
+      "role": "Несущий слой — определяет прочность и форму",
+      "detail": "Радиальный полиэфирный корд, закреплённый вокруг обоих бортовых колец",
+      "color": "#7EA6D8"
+    },
+    {
+      "id": "liner",
+      "index": 4,
+      "name": "Гермослой",
+      "role": "Удерживает воздух внутри шины",
+      "detail": "Лист галобутилкаучука — по сути внутренняя камера",
+      "color": "#4B5563"
+    },
+    {
+      "id": "sidewall",
+      "index": 5,
+      "name": "Боковина",
+      "role": "Защищает каркас от бордюров и погоды",
+      "detail": "Эластичная смесь с маркировкой размера",
+      "color": "#303A47"
+    },
+    {
+      "id": "bead",
+      "index": 6,
+      "name": "Бортовые кольца",
+      "role": "Плотно фиксируют шину на ободе",
+      "detail": "Стальные кольца, обёрнутые заворотом каркаса",
+      "color": "#D9A441"
+    }
+  ],
+  "assemblyLayers": [
+    {
+      "id": "liner",
+      "step": 1,
+      "name": "Гермослой",
+      "caption": "Герметичный слой первым наматывается на барабан."
+    },
+    {
+      "id": "carcass",
+      "step": 2,
+      "name": "Каркас",
+      "caption": "Слой радиального корда накладывается поверх гермослоя."
+    },
+    {
+      "id": "bead",
+      "step": 3,
+      "name": "Бортовые кольца",
+      "caption": "Устанавливаются стальные бортовые кольца, каркас заворачивается."
+    },
+    {
+      "id": "sidewall",
+      "step": 4,
+      "name": "Боковины",
+      "caption": "Профили боковин накладываются с обеих сторон."
+    },
+    {
+      "id": "belt",
+      "step": 5,
+      "name": "Брекер",
+      "caption": "Слои металлобрекера стабилизируют корону."
+    },
+    {
+      "id": "tread",
+      "step": 6,
+      "name": "Протектор",
+      "caption": "Лента протектора завершает сборку — зелёная шина готова."
+    }
+  ],
+  "materials": [
+    {
+      "id": "natural-rubber",
+      "name": "Натуральный каучук",
+      "purpose": "Эластичность и упругость",
+      "share": 22,
+      "stage": "mixer",
+      "color": "#4F9A5E"
+    },
+    {
+      "id": "synthetic-rubber",
+      "name": "Синтетический каучук",
+      "purpose": "Износостойкость и долговечность",
+      "share": 23,
+      "stage": "mixer",
+      "color": "#5B8DEF"
+    },
+    {
+      "id": "carbon-black",
+      "name": "Технический углерод",
+      "purpose": "Прочность и сопротивление истиранию",
+      "share": 24,
+      "stage": "mixer",
+      "color": "#1B2430"
+    },
+    {
+      "id": "silica",
+      "name": "Кремнезём",
+      "purpose": "Сцепление на мокрой дороге, меньшее сопротивление качению",
+      "share": 8,
+      "stage": "mixer",
+      "color": "#94A3B8"
+    },
+    {
+      "id": "steel-cord",
+      "name": "Металлокорд",
+      "purpose": "Конструктивная жёсткость короны",
+      "share": 8,
+      "stage": "calender",
+      "color": "#B98A4A"
+    },
+    {
+      "id": "textile-cord",
+      "name": "Текстильный корд",
+      "purpose": "Прочность каркаса и стойкость к разрыву",
+      "share": 5,
+      "stage": "calender",
+      "color": "#7EA6D8"
+    },
+    {
+      "id": "sulphur",
+      "name": "Сера",
+      "purpose": "Образует поперечные связи при вулканизации",
+      "share": 1,
+      "stage": "press",
+      "color": "#E0B93B"
+    },
+    {
+      "id": "oils",
+      "name": "Масла и пластификаторы",
+      "purpose": "Эластичность смеси и технологичность",
+      "share": 6,
+      "stage": "mixer",
+      "color": "#D98A3B"
+    },
+    {
+      "id": "additives",
+      "name": "Химические добавки",
+      "purpose": "Ускорители, антиоксиданты, активаторы",
+      "share": 3,
+      "stage": "mixer",
+      "color": "#7C3AED"
+    }
+  ],
+  "curing": {
+    "temperatureC": [
+      170,
+      200
+    ],
+    "pressureBar": [
+      20,
+      30
+    ]
+  }
+}
