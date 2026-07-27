@@ -10,6 +10,7 @@
 import { FactoryEngine } from '../src/core/engine';
 import type { Params, ScenarioDef } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
+import { checkScenarioVariants, checkVariantConstants, checkVariants } from './verify-variants';
 
 const scenario = scenarioJson as unknown as ScenarioDef;
 
@@ -122,6 +123,12 @@ for (let minute = 0; minute < FULL_SHIFT; minute += 1) {
 for (const expected of ['idle', 'working', 'blocked', 'starved']) {
   if (!states.has(expected)) failures.push(`resource state "${expected}" is never reached`);
 }
+
+// Product-variant data layer (Phase 1): resolveVariant folds a variant patch
+// into the base scenario and returns a plain ScenarioDef.
+failures.push(...checkVariants());
+failures.push(...checkVariantConstants());
+failures.push(...checkScenarioVariants());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

@@ -2,6 +2,7 @@
  * Single source of truth for every tunable constant.
  * No magic numbers are allowed anywhere else in the code base.
  */
+import type { VariantId } from './types';
 
 /** Fixed integration step of the simulation, in simulated minutes. */
 export const TICK_MINUTES = 0.1;
@@ -144,3 +145,32 @@ export const BUFFER_TINT = '#F0FDF4';
 
 /** Opacity applied to non-constraint resources while TOC mode is active. */
 export const TOC_DIMMED_OPACITY = 0.32;
+
+/* ------------------------------------------------------------------ *
+ * Product variants (Phase 1). Colours tint the token rim and legend
+ * per variant; the brand purple #9000FF stays reserved for the working
+ * state, so these are drawn from tire-appropriate warm/cool hues.
+ * ------------------------------------------------------------------ */
+
+/** Token rim / legend colour per product variant. */
+export const VARIANT_COLORS: Record<VariantId, string> = {
+  summer: '#E0A03A',
+  winter: '#2E86C1',
+  'winter-studded': '#5D7A94',
+};
+
+/** Default studding time per tire, in minutes (~110 studs at ~110/min + handling). */
+export const DEFAULT_STUDDING_TIME = 2;
+/** Default number of parallel studding machines. */
+export const DEFAULT_STUDDING_COUNT = 1;
+/** Default rest/curing dwell after studding, compressed to shift scale. */
+export const DEFAULT_REST_MINUTES = 10;
+
+/** Regulation stud protrusion above the tread, in millimetres (spec §2.2). */
+export const STUD_PROTRUSION_MM = 1.2;
+/** Allowed deviation of the stud protrusion, in millimetres. */
+export const STUD_PROTRUSION_TOLERANCE_MM = 0.3;
+
+/** StudCallout: size of the zoomed stud-in-hole cross-section, in viewBox units. */
+export const STUD_CALLOUT_WIDTH = 240;
+export const STUD_CALLOUT_HEIGHT = 200;

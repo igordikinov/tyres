@@ -1,6 +1,6 @@
 import rawTireFactory from '@/scenarios/tire-factory.json';
 import { SHIFT_START_HOUR } from './constants';
-import type { Params, ScenarioDef } from './types';
+import type { NodeDef, Params, ScenarioDef, VariantDef, VariantId } from './types';
 
 /**
  * Scenarios are plain data. Adding a new industry means adding a JSON file,
@@ -14,6 +14,56 @@ export const DEFAULT_SCENARIO_ID = 'tire-factory';
 
 export function getScenario(id: string = DEFAULT_SCENARIO_ID): ScenarioDef {
   return SCENARIOS[id] ?? SCENARIOS[DEFAULT_SCENARIO_ID];
+}
+
+export const DEFAULT_VARIANT_ID: VariantId = 'summer';
+
+/** Variants declared by a scenario, or an empty list. */
+export function listVariants(scenario: ScenarioDef): VariantDef[] {
+  return scenario.variants ?? [];
+}
+
+/**
+ * Folds a variant's data patch into the base scenario and returns a plain
+ * ScenarioDef. The engine, canvas, KPIs and tabs stay variant-agnostic — they
+ * only ever see resolved scenarios. Pure: the base is never mutated, and the
+ * `variants` array is stripped from the result so it can't be resolved twice.
+ */
+export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): ScenarioDef {
+  const { variants, ...rest } = scenario;
+  const base: ScenarioDef = {
+    ...rest,
+    params: { ...scenario.params },
+    optimisedParams: { ...scenario.optimisedParams },
+    paramDefs: [...scenario.paramDefs],
+    nodes: scenario.nodes.map((node) => ({ ...node })),
+  };
+
+  const variant = variants?.find((candidate) => candidate.id === variantId);
+  if (!variant) return base;
+
+  const patched = base.nodes.map((node) => {
+    const patch = variant.nodesPatch?.[node.id];
+    return patch ? { ...node, ...patch } : node;
+  });
+  const added: NodeDef[] = (variant.nodesAdd ?? []).map((node) => ({ ...node }));
+
+  return {
+    ...base,
+    // The scenario name is the factory title (Header/canvas); only the product
+    // string tracks the variant. The variant's short name is metadata the
+    // Header's variant switcher reads from the VariantDef directly.
+    product: variant.product,
+    canvas: variant.canvas ?? base.canvas,
+    params: { ...base.params, ...variant.params },
+    optimisedParams: { ...base.optimisedParams, ...variant.optimisedParams },
+    paramDefs: [...base.paramDefs, ...(variant.extraParamDefs ?? [])],
+    nodes: [...patched, ...added],
+    construction: variant.construction ?? base.construction,
+    assemblyLayers: variant.assemblyLayers ?? base.assemblyLayers,
+    materials: variant.materials ?? base.materials,
+    curing: variant.curing ?? base.curing,
+  };
 }
 
 export function baselineParams(scenario: ScenarioDef): Params {

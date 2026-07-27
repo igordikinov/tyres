@@ -16,7 +16,10 @@
     "inspectionTime": 1.5,
     "pressCount": 4,
     "batchSize": 1,
-    "bufferCapacity": 40
+    "bufferCapacity": 40,
+    "studdingTime": 2,
+    "studdingCount": 1,
+    "restMinutes": 10
   },
   "optimisedParams": {
     "pressCount": 8,
@@ -457,5 +460,145 @@
       20,
       30
     ]
-  }
+  },
+  "variants": [
+    {
+      "id": "summer",
+      "name": "Летняя",
+      "product": "Летняя 205/55 R16 91V",
+      "badge": "Лето"
+    },
+    {
+      "id": "winter",
+      "name": "Зимняя фрикционная",
+      "product": "Зимняя фрикционная 205/55 R16 91T",
+      "badge": "3PMSF",
+      "params": {
+        "mixerTime": 4,
+        "pressTime": 16
+      },
+      "optimisedParams": {
+        "pressTime": 14
+      }
+    },
+    {
+      "id": "winter-studded",
+      "name": "Зимняя шипованная",
+      "product": "Зимняя шипованная 205/55 R16 91T",
+      "badge": "Шипы",
+      "params": {
+        "mixerTime": 4,
+        "pressTime": 16
+      },
+      "optimisedParams": {
+        "studdingTime": 2
+      },
+      "canvas": {
+        "width": 1520,
+        "height": 1240
+      },
+      "extraParamDefs": [
+        {
+          "key": "studdingTime",
+          "label": "Время ошиповки",
+          "unit": "мин",
+          "min": 1,
+          "max": 4,
+          "step": 0.5,
+          "group": "time",
+          "hint": "Запрессовка ~110 шипов при ~110 шип/мин плюс установка и съём"
+        },
+        {
+          "key": "studdingCount",
+          "label": "Автоматы ошиповки",
+          "unit": "шт",
+          "min": 1,
+          "max": 3,
+          "step": 1,
+          "group": "capacity",
+          "hint": "Число автоматов ошиповки, работающих параллельно"
+        },
+        {
+          "key": "restMinutes",
+          "label": "Отлёжка",
+          "unit": "мин",
+          "min": 0,
+          "max": 60,
+          "step": 5,
+          "group": "time",
+          "hint": "Выдержка после ошиповки: в реальности 2–5 суток, здесь сжата до масштаба смены"
+        }
+      ],
+      "nodesPatch": {
+        "inspection": {
+          "next": "studding"
+        },
+        "warehouse": {
+          "index": 13,
+          "x": 770,
+          "y": 1040,
+          "dir": 1,
+          "narration": "Готовые шипованные шины складируются для отгрузки."
+        }
+      },
+      "nodesAdd": [
+        {
+          "id": "studding",
+          "index": 10,
+          "name": "Ошиповка",
+          "subtitle": "Автомат ошиповки",
+          "kind": "process",
+          "machine": "studding",
+          "processMinutes": 2,
+          "capacity": 1,
+          "queueCapacity": 6,
+          "transportMinutes": 2,
+          "next": "studCheck",
+          "x": 150,
+          "y": 640,
+          "dir": -1,
+          "timeParam": "studdingTime",
+          "capacityParam": "studdingCount",
+          "transformsAppearance": true,
+          "narration": "Вулканизированная шина ошиповывается: смазка отверстий и запрессовка шипов."
+        },
+        {
+          "id": "studCheck",
+          "index": 11,
+          "name": "Контроль шипов",
+          "subtitle": "Выступание 1,2 мм",
+          "kind": "process",
+          "machine": "studcheck",
+          "processMinutes": 0.8,
+          "capacity": 1,
+          "queueCapacity": 6,
+          "transportMinutes": 1.4,
+          "next": "restRack",
+          "x": 150,
+          "y": 1040,
+          "dir": 1,
+          "narration": "Проверяется выступание шипа над протектором и посадка без перекоса."
+        },
+        {
+          "id": "restRack",
+          "index": 12,
+          "name": "Отлёжка",
+          "subtitle": "Выдержка после ошиповки",
+          "kind": "process",
+          "machine": "buffer",
+          "processMinutes": 10,
+          "capacity": 24,
+          "queueCapacity": 8,
+          "transportMinutes": 1.2,
+          "next": "warehouse",
+          "x": 460,
+          "y": 1040,
+          "dir": 1,
+          "rackColumns": 8,
+          "timeParam": "restMinutes",
+          "narration": "Шина отлёживается, чтобы резина обжала корпус шипа (в реальности 2–5 суток)."
+        }
+      ]
+    }
+  ]
 }

@@ -19,7 +19,9 @@ export type MachineKind =
   | 'buffer'
   | 'press'
   | 'inspection'
-  | 'warehouse';
+  | 'warehouse'
+  | 'studding'
+  | 'studcheck';
 
 export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved';
 
@@ -32,7 +34,10 @@ export type ParamKey =
   | 'inspectionTime'
   | 'pressCount'
   | 'batchSize'
-  | 'bufferCapacity';
+  | 'bufferCapacity'
+  | 'studdingTime'
+  | 'studdingCount'
+  | 'restMinutes';
 
 export type Params = Record<ParamKey, number>;
 
@@ -117,6 +122,42 @@ export interface CuringSpec {
   pressureBar: [number, number];
 }
 
+/** Product variants share one line; each is a data patch over the scenario. */
+export type VariantId = 'summer' | 'winter' | 'winter-studded';
+
+/**
+ * A variant is a thin data layer over the base scenario. resolveVariant() folds
+ * it into a plain ScenarioDef, so the engine, canvas and KPIs never see this.
+ */
+export interface VariantDef {
+  id: VariantId;
+  /** «Летняя», «Зимняя фрикционная», «Зимняя шипованная». */
+  name: string;
+  /** Product string shown in the Header, e.g. «Зимняя шипованная 205/55 R16 91T». */
+  product: string;
+  /** «Лето» | «3PMSF» | «Шипы». */
+  badge?: string;
+  /** Optional per-variant token colour override; the canonical source is VARIANT_COLORS. */
+  tokenColor?: string;
+  /** Overrides folded onto the base params. */
+  params?: Partial<Params>;
+  /** The "after" params for Compare Mode. */
+  optimisedParams?: Partial<Params>;
+  /** Extra sliders appended to the base paramDefs (e.g. studding group). */
+  extraParamDefs?: ParamDef[];
+  /** Field-level patches applied to existing nodes by id (narration, next…). */
+  nodesPatch?: Record<string, Partial<NodeDef>>;
+  /** New nodes appended to the chain; wired via their own `next` + a predecessor patch. */
+  nodesAdd?: NodeDef[];
+  /** Overrides the base canvas (studded needs a taller viewBox). */
+  canvas?: { width: number; height: number };
+  /** Full per-variant lists (simpler than diffing). */
+  construction?: ConstructionPart[];
+  assemblyLayers?: AssemblyLayer[];
+  materials?: MaterialDef[];
+  curing?: CuringSpec;
+}
+
 export interface ScenarioDef {
   id: string;
   name: string;
@@ -137,6 +178,8 @@ export interface ScenarioDef {
   /** Raw materials consumed by the line. */
   materials: MaterialDef[];
   curing: CuringSpec;
+  /** Product variants selectable in the Header; resolved away before the engine runs. */
+  variants?: VariantDef[];
 }
 
 export interface UnitView {
@@ -150,6 +193,8 @@ export interface UnitView {
   queueIndex: number;
   slotIndex: number;
   createdAt: number;
+  /** Count of transformsAppearance nodes passed: 0 green → 1 cured → 2 studded. */
+  appearanceStage?: number;
 }
 
 export interface NodeView {
