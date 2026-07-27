@@ -42,14 +42,14 @@ export function AnatomyView() {
         </Panel>
 
         <Panel
-          eyebrow="Взрыв-схема"
+          eyebrow="Схема разузлования"
           title={`${construction.length} слоёв`}
           className="min-w-0 flex-1"
           bodyClassName="min-h-0 p-2"
         >
           <img
             src={explodedView}
-            alt={isStudded ? 'Взрыв-схема шипованной шины' : 'Взрыв-схема слоёв шины'}
+            alt={isStudded ? 'Схема разузлования шипованной шины' : 'Схема разузлования шины'}
             className="h-full w-full object-contain"
           />
         </Panel>

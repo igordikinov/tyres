@@ -26,7 +26,7 @@ const MANIFEST = [
   { src: 'ChatGPT Image 27 июл. 2026 г., 14_09_40.png', out: 'machines/rest-rack.png', width: 512 },
   { src: 'ChatGPT Image 27 июл. 2026 г., 14_12_03.png', out: 'tire/stud-macro.png', width: 360 },
   { src: 'ChatGPT Image 27 июл. 2026 г., 14_26_59.png', out: 'tire/cutaway-studded.png', width: 640 },
-  { src: 'ChatGPT Image 27 июл. 2026 г., 14_19_21.png', out: 'tire/exploded-studded.png', width: 640 },
+  { src: 'ChatGPT Image 27 июл. 2026 г., 17_00_31.png', out: 'tire/exploded-studded.png', width: 640 },
   { src: 'ChatGPT Image 27 июл. 2026 г., 14_28_21.png', out: 'tire/finished-studded.png', width: 480 },
 ];
 
