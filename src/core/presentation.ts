@@ -1,17 +1,11 @@
-import type { Params } from './types';
+import type { PresentationChapter, ScenarioDef } from './types';
 
-export interface PresentationChapter {
-  title: string;
-  narration: string;
-  toc: boolean;
-  aps: boolean;
-  /** Parameter overrides applied when the chapter starts. */
-  params?: Partial<Params>;
-}
+export type { PresentationChapter } from './types';
 
 /**
- * Script of the unattended demonstration.
- * One chapter lasts PRESENTATION_CHAPTER_MINUTES of simulated time.
+ * Built-in fallback script of the unattended demonstration. The scenario data
+ * now owns the script (scenario.presentation); this stays as the default so a
+ * scenario without a presentation field still runs the base eight chapters.
  */
 export const PRESENTATION_SCRIPT: PresentationChapter[] = [
   {
@@ -65,3 +59,10 @@ export const PRESENTATION_SCRIPT: PresentationChapter[] = [
     aps: false,
   },
 ];
+
+/** Resolved presentation script for a scenario, or the built-in fallback. */
+export function presentationFor(scenario: ScenarioDef): PresentationChapter[] {
+  return scenario.presentation && scenario.presentation.length > 0
+    ? scenario.presentation
+    : PRESENTATION_SCRIPT;
+}

@@ -5,6 +5,7 @@ import { Pressable } from '@/components/ui/Pressable';
 import { formatNumber } from '@/core/scenario';
 import { useSimulationControls } from '@/state/SimulationContext';
 import { AssemblySequence } from './AssemblySequence';
+import { StudCallout } from './StudCallout';
 import { TireCrossSection } from './TireCrossSection';
 
 /** Anatomy tab: what a tire is made of, and how it is built. */
@@ -12,6 +13,8 @@ export function AnatomyView() {
   const { scenario } = useSimulationControls();
   const [selected, setSelected] = useState<string | null>(null);
   const { construction, assemblyLayers, curing, product } = scenario;
+  // The stud is a post-vulcanisation part, so it never appears as a build layer.
+  const isStudded = construction.some((part) => part.id === 'stud');
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -35,7 +38,7 @@ export function AnatomyView() {
         </Panel>
 
         <Panel
-          eyebrow="Шесть структурных элементов"
+          eyebrow={`${construction.length} структурных элементов`}
           title="Что делает каждый слой"
           className="min-w-0 flex-[3]"
           bodyClassName="scroll-thin min-h-0 overflow-y-auto p-3"
@@ -97,6 +100,17 @@ export function AnatomyView() {
               </div>
             ))}
           </div>
+
+          {isStudded ? (
+            <>
+              <StudCallout />
+              <p className="mt-2 rounded-xl border border-line bg-surface-muted px-3 py-2 text-[10px] leading-snug text-ink-400">
+                <span className="font-bold text-ink-700">Альтернатива Continental:</span> шипы с термоадгезионным
+                покрытием устанавливают в невулканизированную заготовку и спекают с резиной при вулканизации. В модели
+                процесса не реализуется — показана только классическая ошиповка после вулканизации.
+              </p>
+            </>
+          ) : null}
         </Panel>
       </div>
 

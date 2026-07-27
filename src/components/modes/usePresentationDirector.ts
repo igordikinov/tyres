@@ -1,30 +1,30 @@
 import { useEffect, useRef } from 'react';
-import { PRESENTATION_CHAPTER_MINUTES, PRESENTATION_SPEED } from '@/core/constants';
-import { PRESENTATION_SCRIPT, type PresentationChapter } from '@/core/presentation';
-import type { ParamKey } from '@/core/types';
+import { HORIZON_MINUTES, PRESENTATION_SPEED } from '@/core/constants';
+import { presentationFor } from '@/core/presentation';
+import type { ParamKey, PresentationChapter } from '@/core/types';
 import { useSimulationControls, useSimulationFrame } from '@/state/SimulationContext';
 
 export interface PresentationState {
   chapter: PresentationChapter | null;
   index: number;
   total: number;
+  chapters: PresentationChapter[];
 }
 
 /** Drives the unattended demonstration: no user interaction required. */
 export function usePresentationDirector(): PresentationState {
-  const { demoMode, reset, play, setSpeed, setTocMode, setApsMode, setParam, restoreBaseline } =
+  const { scenario, demoMode, reset, play, setSpeed, setTocMode, setApsMode, setParam, restoreBaseline } =
     useSimulationControls();
   const { snapshot } = useSimulationFrame();
   const appliedRef = useRef(-1);
   const armedRef = useRef(false);
 
+  // The script now travels with the variant; chapters share the shift evenly so
+  // a longer studded script still fits the demonstration window.
+  const script = presentationFor(scenario);
+  const chapterMinutes = HORIZON_MINUTES / script.length;
   const active = demoMode === 'presentation';
-  const index = active
-    ? Math.min(
-        Math.floor(snapshot.time / PRESENTATION_CHAPTER_MINUTES),
-        PRESENTATION_SCRIPT.length - 1,
-      )
-    : -1;
+  const index = active ? Math.min(Math.floor(snapshot.time / chapterMinutes), script.length - 1) : -1;
 
   useEffect(() => {
     if (!active) {
@@ -50,7 +50,7 @@ export function usePresentationDirector(): PresentationState {
   useEffect(() => {
     if (index < 0 || !armedRef.current || appliedRef.current === index) return;
     appliedRef.current = index;
-    const chapter = PRESENTATION_SCRIPT[index];
+    const chapter = script[index];
     setTocMode(chapter.toc);
     setApsMode(chapter.aps);
     if (chapter.params) {
@@ -62,8 +62,9 @@ export function usePresentationDirector(): PresentationState {
   }, [index]);
 
   return {
-    chapter: index >= 0 ? PRESENTATION_SCRIPT[index] : null,
+    chapter: index >= 0 ? script[index] : null,
     index,
-    total: PRESENTATION_SCRIPT.length,
+    total: script.length,
+    chapters: script,
   };
 }

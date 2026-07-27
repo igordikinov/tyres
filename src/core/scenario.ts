@@ -63,6 +63,12 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
     assemblyLayers: variant.assemblyLayers ?? base.assemblyLayers,
     materials: variant.materials ?? base.materials,
     curing: variant.curing ?? base.curing,
+    // Variant chapters extend the base script (§4.7): summer keeps the base 8,
+    // winter/studded append their own.
+    presentation:
+      base.presentation || variant.presentation
+        ? [...(base.presentation ?? []), ...(variant.presentation ?? [])]
+        : undefined,
   };
 }
 

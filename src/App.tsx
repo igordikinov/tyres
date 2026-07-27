@@ -59,7 +59,9 @@ function CanvasStage() {
         <NarrationBanner eyebrow={eyebrow} text={narration} emphasis={emphasis} />
       ) : null}
       <ApsOverlay />
-      {demoMode === 'presentation' ? <ChapterRail index={presentation.index} /> : null}
+      {demoMode === 'presentation' ? (
+        <ChapterRail index={presentation.index} chapters={presentation.chapters} />
+      ) : null}
     </>
   );
 }

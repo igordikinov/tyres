@@ -178,7 +178,46 @@ const studdedText = container.textContent ?? '';
 for (const node of ['Ошиповка', 'Контроль шипов', 'Отлёжка', 'Ошипованная']) {
   expect(studdedText.includes(node), `studded canvas/legend is missing "${node}"`);
 }
+expect(
+  container.querySelectorAll('button').length === 0 && container.querySelectorAll('input').length === 0,
+  'native <button>/<input> elements must not appear after switching variant',
+);
+press('Анатомия');
+await wait(300);
+const studdedAnatomy = container.textContent ?? '';
+expect(studdedAnatomy.includes('Шип противоскольжения'), 'studded anatomy is missing the stud construction element');
+expect(studdedAnatomy.includes('Анатомия шипа'), 'the StudCallout is missing from studded anatomy');
+press('Материалы');
+await wait(300);
+const studdedMaterials = container.textContent ?? '';
+expect(studdedMaterials.includes('Шипы противоскольжения'), 'studded materials table is missing the stud row');
+expect(studdedMaterials.includes('единственный материал'), 'studded materials is missing the post-vulcanisation note');
+press('Онлайн');
+await wait(150);
 press('Лето');
+await wait(150);
+
+// Presentation script now travels in scenario data; the director must run it.
+press('Презентация');
+await wait(400);
+expect(
+  (container.textContent ?? '').includes('полуфабрикаты компонентов'),
+  'the presentation did not open its first chapter from scenario data',
+);
+press('Онлайн');
+await wait(150);
+
+// Compare mode offers a pair selector; the variant pair mirrors two plants.
+press('Сравнение');
+await wait(300);
+expect((container.textContent ?? '').includes('База vs Оптимизация'), 'the compare pair selector is missing');
+press('Лето vs Зима шип.');
+await wait(300);
+expect(
+  (container.textContent ?? '').includes('Зимняя шипованная'),
+  'the variant compare pane did not switch to the studded plant',
+);
+press('Онлайн');
 await wait(150);
 
 // Product-variant token: green → cured → studded, rim tinted by the variant.

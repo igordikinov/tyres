@@ -12,6 +12,7 @@ import type { Params, ScenarioDef } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 import {
   checkAppearanceStage,
+  checkBottleneckMigration,
   checkScenarioVariants,
   checkVariantConstants,
   checkVariantDeterminism,
@@ -137,6 +138,7 @@ failures.push(...checkVariantConstants());
 failures.push(...checkScenarioVariants());
 failures.push(...checkVariantDeterminism());
 failures.push(...checkAppearanceStage());
+failures.push(...checkBottleneckMigration());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

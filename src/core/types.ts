@@ -122,6 +122,16 @@ export interface CuringSpec {
   pressureBar: [number, number];
 }
 
+/** One narrated chapter of the unattended presentation. */
+export interface PresentationChapter {
+  title: string;
+  narration: string;
+  toc: boolean;
+  aps: boolean;
+  /** Parameter overrides applied when the chapter starts. */
+  params?: Partial<Params>;
+}
+
 /** Product variants share one line; each is a data patch over the scenario. */
 export type VariantId = 'summer' | 'winter' | 'winter-studded';
 
@@ -156,6 +166,8 @@ export interface VariantDef {
   assemblyLayers?: AssemblyLayer[];
   materials?: MaterialDef[];
   curing?: CuringSpec;
+  /** Extra chapters appended to the base presentation script. */
+  presentation?: PresentationChapter[];
 }
 
 export interface ScenarioDef {
@@ -178,6 +190,8 @@ export interface ScenarioDef {
   /** Raw materials consumed by the line. */
   materials: MaterialDef[];
   curing: CuringSpec;
+  /** Unattended presentation script; falls back to the built-in default when absent. */
+  presentation?: PresentationChapter[];
   /** Product variants selectable in the Header; resolved away before the engine runs. */
   variants?: VariantDef[];
 }

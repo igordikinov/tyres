@@ -26,6 +26,11 @@ export function MaterialsView() {
     (material) => stage === ALL_STAGES || material.stage === stage,
   );
   const maxShare = Math.max(...scenario.materials.map((material) => material.share));
+  // Studs are the only material that joins the flow after vulcanisation.
+  const studdingStage = scenario.materials.find((material) => material.stage === 'studding')?.stage;
+  const studdingNodeName = studdingStage
+    ? scenario.nodes.find((node) => node.id === studdingStage)?.name ?? 'ошиповке'
+    : null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -100,6 +105,11 @@ export function MaterialsView() {
           Доли ориентировочны для смеси легковой радиальной шины. Сера — едва один процент массы,
           но без неё нет вулканизации, а значит, и самой шины.
         </p>
+        {studdingNodeName ? (
+          <p className="mt-1.5 rounded-lg border border-line bg-surface-muted px-2.5 py-1.5 text-[10px] leading-snug text-ink-500">
+            Шипы — единственный материал, входящий в поток уже после вулканизации, на переделе «{studdingNodeName}».
+          </p>
+        ) : null}
       </Panel>
 
       <Panel

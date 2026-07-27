@@ -1,17 +1,50 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ProductionCanvas } from '@/components/canvas/ProductionCanvas';
+import { Segmented } from '@/components/ui/Segmented';
+import { VARIANT_COLORS } from '@/core/constants';
 import { FactoryEngine } from '@/core/engine';
-import { baselineParams, formatDuration, formatNumber, optimisedParams } from '@/core/scenario';
+import { baselineParams, formatDuration, formatNumber, getScenario, optimisedParams, resolveVariant } from '@/core/scenario';
 import type { Params, ScenarioDef, Snapshot } from '@/core/types';
 import { useSimulationControls, useSimulationFrame } from '@/state/SimulationContext';
 
 const ZONES = ['Подготовка', 'Вулканизация и отделка'];
 
+type PairMode = 'tuning' | 'variants';
+
+const PAIR_OPTIONS: Array<{ value: PairMode; label: string }> = [
+  { value: 'tuning', label: 'База vs Оптимизация' },
+  { value: 'variants', label: 'Лето vs Зима шип.' },
+];
+
+interface Side {
+  scenario: ScenarioDef;
+  params: Params;
+  caption: string;
+  title: string;
+  accent: 'ink' | 'brand';
+  variantColor?: string;
+}
+
+/**
+ * A private engine mirroring the shared clock. Rebuilt whenever the compared
+ * plant changes (pair switch or variant switch) so both panes stay in lockstep.
+ */
 function useMirroredEngine(scenario: ScenarioDef, params: Params, time: number): Snapshot {
   const engineRef = useRef<FactoryEngine | null>(null);
-  if (engineRef.current === null) engineRef.current = new FactoryEngine(scenario, params);
   const lastTimeRef = useRef(0);
-  const [snapshot, setSnapshot] = useState<Snapshot>(() => engineRef.current!.getSnapshot());
+  const [snapshot, setSnapshot] = useState<Snapshot>(() => {
+    engineRef.current = new FactoryEngine(scenario, params);
+    return engineRef.current.getSnapshot();
+  });
+
+  useEffect(() => {
+    const engine = new FactoryEngine(scenario, params);
+    engine.seek(time);
+    engineRef.current = engine;
+    lastTimeRef.current = time;
+    setSnapshot(engine.getSnapshot());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario, params]);
 
   useEffect(() => {
     const engine = engineRef.current!;
@@ -44,12 +77,14 @@ function Pane({
   scenario,
   snapshot,
   accent,
+  variantColor,
 }: {
   title: string;
   caption: string;
   scenario: ScenarioDef;
   snapshot: Snapshot;
   accent: 'ink' | 'brand';
+  variantColor?: string;
 }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl2 border border-line bg-surface">
@@ -74,65 +109,91 @@ function Pane({
         </div>
       </div>
       <div className="min-h-0 flex-1 p-2">
-        <ProductionCanvas scenario={scenario} snapshot={snapshot} tocMode={false} zones={ZONES} />
+        <ProductionCanvas scenario={scenario} snapshot={snapshot} tocMode={false} zones={ZONES} variantColor={variantColor} />
       </div>
     </div>
   );
 }
 
-/** Split screen: the baseline plant against the elevated-constraint plant. */
+/** Split screen: two plants advancing in lockstep — tuning or variant pair. */
 export function CompareView() {
   const { scenario } = useSimulationControls();
   const { snapshot } = useSimulationFrame();
-  const before = useMemo(() => baselineParams(scenario), [scenario]);
-  const after = useMemo(() => optimisedParams(scenario), [scenario]);
-  const beforeSnapshot = useMirroredEngine(scenario, before, snapshot.time);
-  const afterSnapshot = useMirroredEngine(scenario, after, snapshot.time);
+  const [pairMode, setPairMode] = useState<PairMode>('tuning');
+
+  const { left, right, resultLabel } = useMemo<{ left: Side; right: Side; resultLabel: string }>(() => {
+    if (pairMode === 'variants') {
+      const base = getScenario();
+      const summer = resolveVariant(base, 'summer');
+      const studded = resolveVariant(base, 'winter-studded');
+      return {
+        left: { scenario: summer, params: baselineParams(summer), caption: 'Лето', title: summer.product, accent: 'ink', variantColor: VARIANT_COLORS.summer },
+        right: { scenario: studded, params: baselineParams(studded), caption: 'Зима · шипы', title: studded.product, accent: 'brand', variantColor: VARIANT_COLORS['winter-studded'] },
+        resultLabel: 'Одинаковый темп запуска — у шипованной длиннее цикл и больше переделов',
+      };
+    }
+    const before = baselineParams(scenario);
+    const after = optimisedParams(scenario);
+    return {
+      left: { scenario, params: before, caption: 'До', title: `${before.pressCount} прессов · цикл ${before.pressTime} мин`, accent: 'ink' },
+      right: { scenario, params: after, caption: 'После', title: `${after.pressCount} прессов · цикл ${after.pressTime} мин`, accent: 'brand' },
+      resultLabel: 'Результат расширения ограничения',
+    };
+  }, [pairMode, scenario]);
+
+  const leftSnapshot = useMirroredEngine(left.scenario, left.params, snapshot.time);
+  const rightSnapshot = useMirroredEngine(right.scenario, right.params, snapshot.time);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
+      <div className="flex shrink-0 justify-center">
+        <Segmented ariaLabel="Пара сравнения" options={PAIR_OPTIONS} value={pairMode} onChange={setPairMode} />
+      </div>
+
       <div className="flex min-h-0 flex-1 gap-3">
         <Pane
-          caption="До"
-          title={`${before.pressCount} прессов · цикл ${before.pressTime} мин`}
-          scenario={scenario}
-          snapshot={beforeSnapshot}
-          accent="ink"
+          caption={left.caption}
+          title={left.title}
+          scenario={left.scenario}
+          snapshot={leftSnapshot}
+          accent={left.accent}
+          variantColor={left.variantColor}
         />
         <Pane
-          caption="После"
-          title={`${after.pressCount} прессов · цикл ${after.pressTime} мин`}
-          scenario={scenario}
-          snapshot={afterSnapshot}
-          accent="brand"
+          caption={right.caption}
+          title={right.title}
+          scenario={right.scenario}
+          snapshot={rightSnapshot}
+          accent={right.accent}
+          variantColor={right.variantColor}
         />
       </div>
 
       <div className="surface-card shrink-0 px-4 py-2">
-        <p className="label-caps mb-1">Результат расширения ограничения</p>
+        <p className="label-caps mb-1">{resultLabel}</p>
         <div className="grid grid-cols-2 gap-x-8 md:grid-cols-4">
           <ScoreRow
             label="Выработка"
-            before={`${formatNumber(beforeSnapshot.kpi.throughput, 1)}/ч`}
-            after={`${formatNumber(afterSnapshot.kpi.throughput, 1)}/ч`}
+            before={`${formatNumber(leftSnapshot.kpi.throughput, 1)}/ч`}
+            after={`${formatNumber(rightSnapshot.kpi.throughput, 1)}/ч`}
             better="up"
           />
           <ScoreRow
             label="Время цикла"
-            before={formatDuration(beforeSnapshot.kpi.cycleTimeMinutes)}
-            after={formatDuration(afterSnapshot.kpi.cycleTimeMinutes)}
+            before={formatDuration(leftSnapshot.kpi.cycleTimeMinutes)}
+            after={formatDuration(rightSnapshot.kpi.cycleTimeMinutes)}
             better="down"
           />
           <ScoreRow
             label="НЗП"
-            before={formatNumber(beforeSnapshot.kpi.wip)}
-            after={formatNumber(afterSnapshot.kpi.wip)}
+            before={formatNumber(leftSnapshot.kpi.wip)}
+            after={formatNumber(rightSnapshot.kpi.wip)}
             better="down"
           />
           <ScoreRow
             label="Готово"
-            before={formatNumber(beforeSnapshot.kpi.completed)}
-            after={formatNumber(afterSnapshot.kpi.completed)}
+            before={formatNumber(leftSnapshot.kpi.completed)}
+            after={formatNumber(rightSnapshot.kpi.completed)}
             better="up"
           />
         </div>

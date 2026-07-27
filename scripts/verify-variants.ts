@@ -182,6 +182,25 @@ export function checkScenarioVariants(): string[] {
   // Serpentine third row lives below the base two rows.
   expect(by.studCheck?.y === 1040 && by.restRack?.y === 1040 && by.warehouse?.y === 1040, 'third row nodes must sit at y=1040');
 
+  // Bill of materials: each variant's shares sum to 100%, studs only on studded.
+  for (const id of ['summer', 'winter', 'winter-studded'] as VariantId[]) {
+    const materials = resolveVariant(REAL, id).materials;
+    const sum = materials.reduce((total, material) => total + material.share, 0);
+    expect(sum === 100, `${id} material shares must sum to 100, got ${sum}`);
+    const hasStuds = materials.some((material) => material.stage === 'studding');
+    expect(hasStuds === (id === 'winter-studded'), `${id} studding-stage material presence is wrong (${hasStuds})`);
+  }
+
+  // Presentation: base 8 chapters, winter +1, studded +2 (last = constraint migration).
+  expect(resolveVariant(REAL, 'summer').presentation?.length === 8, `summer must keep 8 chapters, got ${resolveVariant(REAL, 'summer').presentation?.length}`);
+  expect(resolveVariant(REAL, 'winter').presentation?.length === 9, `winter must have 9 chapters, got ${resolveVariant(REAL, 'winter').presentation?.length}`);
+  const studdedScript = resolveVariant(REAL, 'winter-studded').presentation;
+  expect(studdedScript?.length === 10, `studded must have 10 chapters, got ${studdedScript?.length}`);
+  expect(
+    studdedScript?.[9]?.title === 'Миграция ограничения' && studdedScript?.[9]?.params?.pressCount === 8 && studdedScript?.[9]?.params?.studdingTime === 3,
+    'studded final chapter must be the constraint migration with pressCount 8 / studdingTime 3',
+  );
+
   return failures;
 }
 
@@ -256,6 +275,46 @@ export function checkAppearanceStage(): string[] {
   const studded = scan('winter-studded');
   if (studded.min !== 0) failures.push(`studded must show green units (stage 0), got min ${studded.min}`);
   if (studded.max !== 2) failures.push(`studded max appearance stage must be 2 (studded), got ${studded.max}`);
+
+  return failures;
+}
+
+/**
+ * The studded constraint story (spec §4.9.3): at defaults the press is the
+ * bottleneck and studding has spare capacity; widening the presses to 8 and
+ * slowing studding to 3 min migrates the constraint onto studding. The studded
+ * lead time is also strictly longer than summer's.
+ */
+export function checkBottleneckMigration(): string[] {
+  const failures: string[] = [];
+  const HORIZON = 300;
+
+  const studded = resolveVariant(REAL, 'winter-studded');
+  const summer = resolveVariant(REAL, 'summer');
+
+  const atDefault = new FactoryEngine(studded, baselineParams(studded));
+  atDefault.advance(HORIZON);
+  const def = atDefault.getSnapshot();
+  if (def.kpi.bottleneckId !== 'press') {
+    failures.push(`studded default bottleneck must be the press, got "${def.kpi.bottleneckId}"`);
+  }
+  if (!(def.kpi.throughput > 12 && def.kpi.throughput < 18)) {
+    failures.push(`studded default throughput should sit near 15–16/h, got ${def.kpi.throughput.toFixed(1)}`);
+  }
+
+  const migrated = new FactoryEngine(studded, { ...baselineParams(studded), pressCount: 8, studdingTime: 3 });
+  migrated.advance(HORIZON);
+  const mig = migrated.getSnapshot();
+  if (mig.kpi.bottleneckId !== 'studding') {
+    failures.push(`with 8 presses and studdingTime 3 the constraint must move to studding, got "${mig.kpi.bottleneckId}"`);
+  }
+
+  const summerRun = new FactoryEngine(summer, baselineParams(summer));
+  summerRun.advance(HORIZON);
+  const summerCycle = summerRun.getSnapshot().kpi.cycleTimeMinutes;
+  if (!(def.kpi.cycleTimeMinutes > summerCycle)) {
+    failures.push(`studded lead time (${def.kpi.cycleTimeMinutes.toFixed(0)}) must exceed summer (${summerCycle.toFixed(0)})`);
+  }
 
   return failures;
 }
