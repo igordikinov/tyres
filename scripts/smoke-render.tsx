@@ -166,6 +166,7 @@ expect(container.querySelectorAll('button').length === 0, 'native <button> eleme
 expect(container.querySelectorAll('input').length === 0, 'native <input> elements must not be used');
 
 // Switching to the studded variant reveals the studding line and its slider group.
+const canvasImagesSummer = container.querySelectorAll('svg image').length;
 press('Шипы');
 await wait(250);
 for (const label of ['Время ошиповки', 'Автоматы ошиповки', 'Отлёжка']) {
@@ -174,6 +175,11 @@ for (const label of ['Время ошиповки', 'Автоматы ошипо
     `studding slider "${label}" is missing for the studded variant`,
   );
 }
+// The three new stations render as photos, so the canvas gains <image> elements.
+expect(
+  container.querySelectorAll('svg image').length > canvasImagesSummer,
+  'studded stations did not add photo <image> elements to the canvas',
+);
 const studdedText = container.textContent ?? '';
 for (const node of ['Ошиповка', 'Контроль шипов', 'Отлёжка', 'Ошипованная']) {
   expect(studdedText.includes(node), `studded canvas/legend is missing "${node}"`);
@@ -187,6 +193,14 @@ await wait(300);
 const studdedAnatomy = container.textContent ?? '';
 expect(studdedAnatomy.includes('Шип противоскольжения'), 'studded anatomy is missing the stud construction element');
 expect(studdedAnatomy.includes('Анатомия шипа'), 'the StudCallout is missing from studded anatomy');
+expect(
+  container.querySelector('img[alt*="шипованной"]') !== null,
+  'studded anatomy is missing the studded cutaway/exploded imagery',
+);
+expect(
+  container.querySelector('img[alt="Готовая шипованная шина"]') !== null,
+  'studded anatomy is missing the finished-studded photo',
+);
 press('Материалы');
 await wait(300);
 const studdedMaterials = container.textContent ?? '';
@@ -219,6 +233,14 @@ expect(
 );
 press('Онлайн');
 await wait(150);
+
+// Studding and stud-check stations render as realistic photos, like the rest
+// of the line (tyre-tvz.2), not inline SVG.
+const { MACHINE_IMAGES } = await import('../src/components/machines/machineImages');
+for (const kind of ['studding', 'studcheck', 'reststack']) {
+  const href = (MACHINE_IMAGES as Record<string, string | undefined>)[kind];
+  expect(typeof href === 'string' && href.length > 0, `MACHINE_IMAGES is missing a photo for "${kind}"`);
+}
 
 // Product-variant token: green → cured → studded, rim tinted by the variant.
 const { TireToken } = await import('../src/components/canvas/TireToken');

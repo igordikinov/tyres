@@ -21,7 +21,8 @@ export type MachineKind =
   | 'inspection'
   | 'warehouse'
   | 'studding'
-  | 'studcheck';
+  | 'studcheck'
+  | 'reststack';
 
 export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved';
 

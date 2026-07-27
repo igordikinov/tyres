@@ -7,10 +7,13 @@ export interface TireCrossSectionProps {
   parts: ConstructionPart[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  /** Cutaway render for the active variant; defaults to the summer cutaway. */
+  image?: string;
+  alt?: string;
 }
 
 /** Realistic tire cutaway; the selected layer tints the surrounding accent. */
-export function TireCrossSection({ parts, selectedId }: TireCrossSectionProps) {
+export function TireCrossSection({ parts, selectedId, image = cutaway, alt = 'Разрез радиальной шины' }: TireCrossSectionProps) {
   const selected = parts.find((part) => part.id === selectedId) ?? null;
   const accent = selected?.color ?? 'transparent';
 
@@ -23,8 +26,8 @@ export function TireCrossSection({ parts, selectedId }: TireCrossSectionProps) {
         transition={{ duration: MOTION_BASE, ease: MOTION_EASE }}
       />
       <img
-        src={cutaway}
-        alt="Разрез радиальной шины"
+        src={image}
+        alt={alt}
         className="max-h-full max-w-full object-contain drop-shadow-sm"
       />
       {selected ? (

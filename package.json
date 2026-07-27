@@ -9,6 +9,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
+    "assets": "node scripts/process-assets.mjs",
     "verify": "node scripts/run-verify.mjs",
     "smoke": "node scripts/run-smoke.mjs",
     "check": "npm run typecheck && npm run verify && npm run smoke"

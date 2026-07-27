@@ -733,7 +733,7 @@
           "name": "Отлёжка",
           "subtitle": "Выдержка после ошиповки",
           "kind": "process",
-          "machine": "buffer",
+          "machine": "reststack",
           "processMinutes": 10,
           "capacity": 24,
           "queueCapacity": 8,

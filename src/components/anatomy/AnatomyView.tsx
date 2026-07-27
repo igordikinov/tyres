@@ -1,5 +1,10 @@
 import { useState } from 'react';
+import cutaway from '@/assets/img/tire/cutaway.png';
+import cutawayStudded from '@/assets/img/tire/cutaway-studded.png';
 import exploded from '@/assets/img/tire/exploded.png';
+import explodedStudded from '@/assets/img/tire/exploded-studded.png';
+import finishedStudded from '@/assets/img/tire/finished-studded.png';
+import studMacro from '@/assets/img/tire/stud-macro.png';
 import { Panel } from '@/components/ui/Panel';
 import { Pressable } from '@/components/ui/Pressable';
 import { formatNumber } from '@/core/scenario';
@@ -15,6 +20,8 @@ export function AnatomyView() {
   const { construction, assemblyLayers, curing, product } = scenario;
   // The stud is a post-vulcanisation part, so it never appears as a build layer.
   const isStudded = construction.some((part) => part.id === 'stud');
+  const crossSection = isStudded ? cutawayStudded : cutaway;
+  const explodedView = isStudded ? explodedStudded : exploded;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -25,16 +32,26 @@ export function AnatomyView() {
           className="min-w-0 flex-[2]"
           bodyClassName="min-h-0 p-2"
         >
-          <TireCrossSection parts={construction} selectedId={selected} onSelect={setSelected} />
+          <TireCrossSection
+            parts={construction}
+            selectedId={selected}
+            onSelect={setSelected}
+            image={crossSection}
+            alt={isStudded ? 'Разрез шипованной шины' : 'Разрез радиальной шины'}
+          />
         </Panel>
 
         <Panel
           eyebrow="Взрыв-схема"
-          title="6 слоёв"
+          title={`${construction.length} слоёв`}
           className="min-w-0 flex-1"
           bodyClassName="min-h-0 p-2"
         >
-          <img src={exploded} alt="Взрыв-схема слоёв шины" className="h-full w-full object-contain" />
+          <img
+            src={explodedView}
+            alt={isStudded ? 'Взрыв-схема шипованной шины' : 'Взрыв-схема слоёв шины'}
+            className="h-full w-full object-contain"
+          />
         </Panel>
 
         <Panel
@@ -103,6 +120,16 @@ export function AnatomyView() {
 
           {isStudded ? (
             <>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <figure className="rounded-xl border border-line bg-surface p-2">
+                  <img src={studMacro} alt="Шип противоскольжения крупным планом" className="mx-auto h-24 w-auto object-contain" />
+                  <figcaption className="mt-1 text-center text-[10px] text-ink-400">Шип: корпус + вставка ВК6/ВК8 + фланец</figcaption>
+                </figure>
+                <figure className="rounded-xl border border-line bg-surface p-2">
+                  <img src={finishedStudded} alt="Готовая шипованная шина" className="mx-auto h-24 w-auto object-contain" />
+                  <figcaption className="mt-1 text-center text-[10px] text-ink-400">Готовая шипованная шина</figcaption>
+                </figure>
+              </div>
               <StudCallout />
               <p className="mt-2 rounded-xl border border-line bg-surface-muted px-3 py-2 text-[10px] leading-snug text-ink-400">
                 <span className="font-bold text-ink-700">Альтернатива Continental:</span> шипы с термоадгезионным

@@ -7,6 +7,9 @@ import inspection from '@/assets/img/machines/inspection.png';
 import mixer from '@/assets/img/machines/mixer.png';
 import press from '@/assets/img/machines/press.png';
 import raw from '@/assets/img/machines/raw.png';
+import restStack from '@/assets/img/machines/rest-rack.png';
+import studcheck from '@/assets/img/machines/studcheck.png';
+import studding from '@/assets/img/machines/studding.png';
 
 /**
  * Realistic equipment renders for the process stations. Buffer and warehouse
@@ -21,4 +24,7 @@ export const MACHINE_IMAGES: Partial<Record<MachineKind, string>> = {
   assembly,
   press,
   inspection,
+  studding,
+  studcheck,
+  reststack: restStack,
 };

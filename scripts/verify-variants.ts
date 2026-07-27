@@ -175,6 +175,7 @@ export function checkScenarioVariants(): string[] {
   expect(by.studding?.machine === 'studding' && by.studding?.transformsAppearance === true, 'studding node must use the studding machine and transform appearance');
   expect(by.studding?.timeParam === 'studdingTime' && by.studding?.capacityParam === 'studdingCount', 'studding node must bind studdingTime/studdingCount');
   expect(by.restRack?.kind === 'process' && by.restRack?.capacity === 24 && by.restRack?.timeParam === 'restMinutes', 'restRack must be a process node with capacity 24 driven by restMinutes');
+  expect(by.restRack?.machine === 'reststack', `restRack must use the reststack photo, got machine "${String(by.restRack?.machine)}"`);
   expect(
     by.studding?.next === 'studCheck' && by.studCheck?.next === 'restRack' && by.restRack?.next === 'warehouse' && by.warehouse?.next === null,
     'studded chain must be inspection→studding→studCheck→restRack→warehouse→∅',

@@ -3,10 +3,11 @@ import type { MachineKind } from '@/core/types';
 import { BufferMachine, InspectionMachine, PressMachine, WarehouseMachine } from './FinishingMachines';
 import { AssemblyMachine, BeadMachine, CalenderMachine } from './FormingMachines';
 import { ExtruderMachine, MixerMachine, RawMaterialMachine } from './PreparationMachines';
-import { StuddingMachine, StudCheckMachine } from './StuddingMachines';
 import type { MachineProps } from './parts';
 
-const REGISTRY: Record<MachineKind, ComponentType<MachineProps>> = {
+// Partial: process stations (incl. studding/studcheck) render as photos via
+// MACHINE_IMAGES; only buffer/warehouse fall through to this SVG art.
+const REGISTRY: Partial<Record<MachineKind, ComponentType<MachineProps>>> = {
   raw: RawMaterialMachine,
   mixer: MixerMachine,
   extruder: ExtruderMachine,
@@ -17,8 +18,6 @@ const REGISTRY: Record<MachineKind, ComponentType<MachineProps>> = {
   press: PressMachine,
   inspection: InspectionMachine,
   warehouse: WarehouseMachine,
-  studding: StuddingMachine,
-  studcheck: StudCheckMachine,
 };
 
 export interface MachineArtProps extends MachineProps {
