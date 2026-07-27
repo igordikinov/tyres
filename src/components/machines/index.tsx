@@ -3,11 +3,10 @@ import type { MachineKind } from '@/core/types';
 import { BufferMachine, InspectionMachine, PressMachine, WarehouseMachine } from './FinishingMachines';
 import { AssemblyMachine, BeadMachine, CalenderMachine } from './FormingMachines';
 import { ExtruderMachine, MixerMachine, RawMaterialMachine } from './PreparationMachines';
+import { StuddingMachine, StudCheckMachine } from './StuddingMachines';
 import type { MachineProps } from './parts';
 
-// Partial: 'studding'/'studcheck' renderers land with the studded line (tyre-ag5.6).
-// MachineArt already falls back to null for a kind without a drawing.
-const REGISTRY: Partial<Record<MachineKind, ComponentType<MachineProps>>> = {
+const REGISTRY: Record<MachineKind, ComponentType<MachineProps>> = {
   raw: RawMaterialMachine,
   mixer: MixerMachine,
   extruder: ExtruderMachine,
@@ -18,6 +17,8 @@ const REGISTRY: Partial<Record<MachineKind, ComponentType<MachineProps>>> = {
   press: PressMachine,
   inspection: InspectionMachine,
   warehouse: WarehouseMachine,
+  studding: StuddingMachine,
+  studcheck: StudCheckMachine,
 };
 
 export interface MachineArtProps extends MachineProps {

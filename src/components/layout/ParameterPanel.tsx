@@ -63,6 +63,7 @@ export function ParameterPanel() {
   const groups: Array<{ key: ParamDef['group']; label: string }> = [
     { key: 'time', label: 'Время операций' },
     { key: 'capacity', label: 'Мощность и партии' },
+    { key: 'studding', label: 'Ошиповка' },
   ];
 
   return (
@@ -79,13 +80,15 @@ export function ParameterPanel() {
       }
     >
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-4">
-        {groups.map((group) => (
-          <div key={group.key}>
-            <SectionLabel>{group.label}</SectionLabel>
-            <div className="divide-y divide-line">
-              {scenario.paramDefs
-                .filter((def) => def.group === group.key)
-                .map((def) => (
+        {groups.map((group) => {
+          const defs = scenario.paramDefs.filter((def) => def.group === group.key);
+          // A variant that doesn't use a group (e.g. summer has no studding) hides it.
+          if (defs.length === 0) return null;
+          return (
+            <div key={group.key}>
+              <SectionLabel>{group.label}</SectionLabel>
+              <div className="divide-y divide-line">
+                {defs.map((def) => (
                   <ParameterRow
                     key={def.key}
                     def={def}
@@ -94,9 +97,10 @@ export function ParameterPanel() {
                     isConstraint={constraintParams.has(def.key)}
                   />
                 ))}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
 
         <SectionLabel>Слои демонстрации</SectionLabel>
         <div className="flex flex-col gap-2">

@@ -18,7 +18,9 @@ import {
   STUD_PROTRUSION_TOLERANCE_MM,
   VARIANT_COLORS,
 } from '../src/core/constants';
-import { DEFAULT_VARIANT_ID, listVariants, resolveVariant } from '../src/core/scenario';
+import { HORIZON_MINUTES } from '../src/core/constants';
+import { FactoryEngine } from '../src/core/engine';
+import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveVariant } from '../src/core/scenario';
 import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 
@@ -179,6 +181,81 @@ export function checkScenarioVariants(): string[] {
   );
   // Serpentine third row lives below the base two rows.
   expect(by.studCheck?.y === 1040 && by.restRack?.y === 1040 && by.warehouse?.y === 1040, 'third row nodes must sit at y=1040');
+
+  return failures;
+}
+
+/**
+ * Every resolved variant must run in a freshly-created engine and stay
+ * deterministic: a jittery live run and a single seek() must land bit-identical
+ * (spec §4.9.1). This underpins tyre-ag5.4 recreating the engine on a switch.
+ */
+export function checkVariantDeterminism(): string[] {
+  const failures: string[] = [];
+  const ids: VariantId[] = ['summer', 'winter', 'winter-studded'];
+
+  for (const id of ids) {
+    const sc = resolveVariant(REAL, id);
+    const params = baselineParams(sc);
+
+    const live = new FactoryEngine(sc, { ...params });
+    let elapsed = 0;
+    let seed = 7;
+    while (elapsed < HORIZON_MINUTES) {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      const frame = Math.min(0.02 + (seed / 2147483648) * 0.12, HORIZON_MINUTES - elapsed);
+      live.advance(frame);
+      elapsed += frame;
+    }
+    const replay = new FactoryEngine(sc, { ...params });
+    replay.seek(HORIZON_MINUTES);
+
+    const a = live.getSnapshot();
+    const b = replay.getSnapshot();
+    if (a.kpi.completed !== b.kpi.completed || a.kpi.wip !== b.kpi.wip) {
+      failures.push(
+        `variant "${id}" diverges live vs seek(): completed ${a.kpi.completed}/${b.kpi.completed}, wip ${a.kpi.wip}/${b.kpi.wip}`,
+      );
+    }
+    if (a.kpi.completed <= 0) {
+      failures.push(`variant "${id}" produced nothing over a full shift — chain likely broken`);
+    }
+  }
+
+  return failures;
+}
+
+/**
+ * Units carry an appearance stage = number of transformsAppearance nodes exited
+ * (0 green → 1 cured → 2 studded). Summer has one such node (the press), studded
+ * has two (press + studding). Verifies snapshot populates it (tyre-ag5.3).
+ */
+export function checkAppearanceStage(): string[] {
+  const failures: string[] = [];
+
+  const scan = (id: VariantId): { min: number; max: number } => {
+    const sc = resolveVariant(REAL, id);
+    const engine = new FactoryEngine(sc, baselineParams(sc));
+    let min = 9;
+    let max = -1;
+    for (let t = 0; t < HORIZON_MINUTES; t += 1) {
+      engine.advance(1);
+      for (const unit of engine.getSnapshot().units) {
+        const stage = unit.appearanceStage ?? -1;
+        if (stage < min) min = stage;
+        if (stage > max) max = stage;
+      }
+    }
+    return { min, max };
+  };
+
+  const summer = scan('summer');
+  if (summer.min !== 0) failures.push(`summer must show green units (stage 0), got min ${summer.min}`);
+  if (summer.max !== 1) failures.push(`summer max appearance stage must be 1 (cured), got ${summer.max}`);
+
+  const studded = scan('winter-studded');
+  if (studded.min !== 0) failures.push(`studded must show green units (stage 0), got min ${studded.min}`);
+  if (studded.max !== 2) failures.push(`studded max appearance stage must be 2 (studded), got ${studded.max}`);
 
   return failures;
 }

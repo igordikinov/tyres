@@ -60,6 +60,24 @@ export function buildSnapshot(state: EngineState): Snapshot {
     node.queue.forEach((unitId, index) => queueIndex.set(unitId, index));
   }
 
+  // Appearance stage = number of transformsAppearance nodes a unit has exited
+  // (0 green → 1 cured → 2 studded). A unit sitting at, or moving toward, a node
+  // has exited every node strictly upstream, so we compare chain positions.
+  const chainOrder = new Map<string, number>();
+  const byId = new Map(state.scenario.nodes.map((node) => [node.id, node]));
+  let cursor = state.scenario.nodes.find((node) => node.kind === 'source')?.id ?? null;
+  for (let order = 0; cursor && !chainOrder.has(cursor); order += 1) {
+    chainOrder.set(cursor, order);
+    cursor = byId.get(cursor)?.next ?? null;
+  }
+  const transformOrders = state.scenario.nodes
+    .filter((node) => node.transformsAppearance)
+    .map((node) => chainOrder.get(node.id) ?? Number.POSITIVE_INFINITY);
+  const stageAt = (nodeId: string): number => {
+    const position = chainOrder.get(nodeId) ?? 0;
+    return transformOrders.reduce((count, order) => count + (order < position ? 1 : 0), 0);
+  };
+
   const units: UnitView[] = [];
   for (const unit of state.units.values()) {
     if (unit.phase === 'done') continue;
@@ -72,6 +90,7 @@ export function buildSnapshot(state: EngineState): Snapshot {
       queueIndex: queueIndex.get(unit.id) ?? 0,
       slotIndex: unit.slotIndex,
       createdAt: unit.createdAt,
+      appearanceStage: stageAt(unit.nodeId),
     });
   }
 

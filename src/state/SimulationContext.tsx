@@ -6,11 +6,20 @@ import {
   MAX_FRAME_MINUTES,
   SIM_MINUTES_PER_REAL_SECOND,
   STEP_MINUTES,
+  VARIANT_COLORS,
   type SpeedOption,
 } from '@/core/constants';
 import { FactoryEngine } from '@/core/engine';
-import { baselineParams, getScenario, nodeDefsById, optimisedParams } from '@/core/scenario';
-import type { ParamKey, Params, Snapshot } from '@/core/types';
+import {
+  baselineParams,
+  DEFAULT_VARIANT_ID,
+  getScenario,
+  listVariants,
+  nodeDefsById,
+  optimisedParams,
+  resolveVariant,
+} from '@/core/scenario';
+import type { ParamKey, Params, Snapshot, VariantDef, VariantId } from '@/core/types';
 import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import {
   ControlsContext,
@@ -32,7 +41,15 @@ export { useSimulationControls, useSimulationFrame, useSimulationKpi } from './c
  * KPI cards to reconcile on every frame.
  */
 export function SimulationProvider({ children }: { children: ReactNode }) {
-  const scenario = useMemo(() => getScenario(), []);
+  const baseScenario = useMemo(() => getScenario(), []);
+  // Token colours are single-sourced in VARIANT_COLORS; fill them in once here.
+  const variants = useMemo<VariantDef[]>(
+    () => listVariants(baseScenario).map((v) => ({ ...v, tokenColor: v.tokenColor ?? VARIANT_COLORS[v.id] })),
+    [baseScenario],
+  );
+
+  const [variantId, setVariantId] = useState<VariantId>(DEFAULT_VARIANT_ID);
+  const scenario = useMemo(() => resolveVariant(baseScenario, variantId), [baseScenario, variantId]);
   const defs = useMemo(() => nodeDefsById(scenario), [scenario]);
   const engineRef = useRef<FactoryEngine | null>(null);
   if (engineRef.current === null) {
@@ -166,10 +183,36 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [commitParams, scenario],
   );
 
+  // Switching variant is a hard, deterministic reset: build a fresh engine for
+  // the resolved scenario at its baseline, then republish from clock zero. This
+  // mirrors seek(0) so a live run of the new variant stays reproducible.
+  const setVariant = useCallback(
+    (id: VariantId) => {
+      if (id === variantId) return;
+      const nextScenario = resolveVariant(baseScenario, id);
+      const nextParams = baselineParams(nextScenario);
+      const nextEngine = new FactoryEngine(nextScenario, nextParams);
+      engineRef.current = nextEngine;
+      playingRef.current = false;
+      setPlaying(false);
+      setVariantId(id);
+      setParams(nextParams);
+      const shot = nextEngine.getSnapshot();
+      setSnapshot(shot);
+      setKpiFrame({ kpi: shot.kpi, history: shot.history, time: shot.time });
+      lastKpiRef.current = 0;
+      markDirty();
+    },
+    [variantId, baseScenario, markDirty],
+  );
+
   const controls = useMemo<SimulationControls>(
     () => ({
       scenario,
       defs,
+      variantId,
+      variants,
+      setVariant,
       params,
       playing,
       speed,
@@ -193,6 +236,9 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [
       scenario,
       defs,
+      variantId,
+      variants,
+      setVariant,
       params,
       playing,
       speed,

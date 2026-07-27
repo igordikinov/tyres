@@ -12,10 +12,18 @@ import { ActionButton } from '@/components/ui/ActionButton';
 import { Segmented } from '@/components/ui/Segmented';
 import { SPEED_OPTIONS, type SpeedOption } from '@/core/constants';
 import { formatShiftClock } from '@/core/scenario';
+import type { VariantId } from '@/core/types';
 import { useSimulationControls, useSimulationKpi, type DemoMode } from '@/state/SimulationContext';
 import { LivePulse } from './LivePulse';
 
 const SPEED_OPTIONS_UI = SPEED_OPTIONS.map((speed) => ({ value: speed, label: `${speed}x` }));
+
+/** Short labels for the product-variant switcher (§4.5). */
+const VARIANT_LABELS: Record<VariantId, string> = {
+  summer: 'Лето',
+  winter: 'Зима',
+  'winter-studded': 'Шипы',
+};
 
 /** Tracks the viewport width so no control is ever hidden outright. */
 function useCompactHeader(): boolean {
@@ -52,6 +60,9 @@ export function Header() {
   const compact = useCompactHeader();
   const {
     scenario,
+    variantId,
+    variants,
+    setVariant,
     playing,
     speed,
     setSpeed,
@@ -66,6 +77,14 @@ export function Header() {
     apsMode,
     setApsMode,
   } = useSimulationControls();
+
+  const activeVariant = variants.find((variant) => variant.id === variantId);
+  const variantOptions = variants.map((variant) => ({
+    value: variant.id,
+    label: VARIANT_LABELS[variant.id],
+  }));
+  // The product switcher is hidden during a presentation so it can't derail the script.
+  const showVariantSwitch = demoMode !== 'presentation';
 
   return (
     <header className="flex shrink-0 items-center justify-between gap-6 border-b border-line bg-surface px-6 py-3">
@@ -82,11 +101,29 @@ export function Header() {
         <span className="hidden h-8 w-px bg-line lg:block" />
         <div className="hidden min-w-0 items-center gap-2 lg:flex">
           <LivePulse running={playing} />
-          <span className="text-[12px] font-semibold text-ink-500">Интерактивная симуляция</span>
+          <span className="truncate text-[12px] font-semibold text-ink-500">{scenario.product}</span>
+          {activeVariant?.badge ? (
+            <span
+              className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{ color: activeVariant.tokenColor, backgroundColor: `${activeVariant.tokenColor}1F` }}
+            >
+              {activeVariant.badge}
+            </span>
+          ) : null}
         </div>
       </div>
 
       <div className="flex items-center gap-3">
+        {showVariantSwitch ? (
+          <Segmented
+            ariaLabel="Вариант продукта"
+            options={variantOptions}
+            value={variantId}
+            onChange={setVariant}
+            compact={compact}
+          />
+        ) : null}
+
         <div className="flex items-center gap-2">
           <ActionButton
             label="Показать ТОС"

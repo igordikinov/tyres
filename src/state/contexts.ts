@@ -1,6 +1,16 @@
 import { createContext, useContext } from 'react';
 import type { SpeedOption } from '@/core/constants';
-import type { HistoryPoint, Kpi, NodeDef, ParamKey, Params, ScenarioDef, Snapshot } from '@/core/types';
+import type {
+  HistoryPoint,
+  Kpi,
+  NodeDef,
+  ParamKey,
+  Params,
+  ScenarioDef,
+  Snapshot,
+  VariantDef,
+  VariantId,
+} from '@/core/types';
 
 export type DemoMode = 'live' | 'compare' | 'presentation' | 'anatomy' | 'materials';
 
@@ -8,6 +18,12 @@ export type DemoMode = 'live' | 'compare' | 'presentation' | 'anatomy' | 'materi
 export interface SimulationControls {
   scenario: ScenarioDef;
   defs: Record<string, NodeDef>;
+  /** Active product variant. */
+  variantId: VariantId;
+  /** Selectable variants (token colours resolved from VARIANT_COLORS). */
+  variants: VariantDef[];
+  /** Switch product variant: deterministically recreates the engine. */
+  setVariant: (id: VariantId) => void;
   params: Params;
   playing: boolean;
   speed: SpeedOption;

@@ -10,7 +10,13 @@
 import { FactoryEngine } from '../src/core/engine';
 import type { Params, ScenarioDef } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
-import { checkScenarioVariants, checkVariantConstants, checkVariants } from './verify-variants';
+import {
+  checkAppearanceStage,
+  checkScenarioVariants,
+  checkVariantConstants,
+  checkVariantDeterminism,
+  checkVariants,
+} from './verify-variants';
 
 const scenario = scenarioJson as unknown as ScenarioDef;
 
@@ -129,6 +135,8 @@ for (const expected of ['idle', 'working', 'blocked', 'starved']) {
 failures.push(...checkVariants());
 failures.push(...checkVariantConstants());
 failures.push(...checkScenarioVariants());
+failures.push(...checkVariantDeterminism());
+failures.push(...checkAppearanceStage());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

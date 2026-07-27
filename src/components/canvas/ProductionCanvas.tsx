@@ -30,6 +30,8 @@ export interface ProductionCanvasProps {
   informationFlow?: boolean;
   /** Optional caption per canvas row, in flow order. */
   zones?: string[];
+  /** Token rim colour of the active variant. */
+  variantColor?: string;
 }
 
 function buildLinks(nodes: NodeDef[]): Record<string, LinkGeometry> {
@@ -51,6 +53,7 @@ export function ProductionCanvas({
   tocMode,
   informationFlow = false,
   zones,
+  variantColor,
 }: ProductionCanvasProps) {
   const gridId = `grid-${useId()}`;
   const defs = useMemo(
@@ -58,10 +61,6 @@ export function ProductionCanvas({
     [scenario],
   );
   const links = useMemo(() => buildLinks(scenario.nodes), [scenario]);
-  const transformIndex = useMemo(() => {
-    const marker = scenario.nodes.find((node) => node.transformsAppearance);
-    return marker ? marker.index : Number.POSITIVE_INFINITY;
-  }, [scenario]);
   const rows = useMemo(() => Array.from(new Set(scenario.nodes.map((node) => node.y))), [scenario]);
 
   /**
@@ -180,7 +179,8 @@ export function ProductionCanvas({
             key={unit.id}
             x={point.x}
             y={point.y}
-            cured={def.index > transformIndex}
+            stage={unit.appearanceStage ?? 0}
+            variantColor={variantColor}
             moving={unit.phase === 'moving'}
             highlighted={unit.phase === 'service'}
             dimmed={isDimmed(unit.nodeId)}

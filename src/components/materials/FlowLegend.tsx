@@ -7,6 +7,7 @@ import {
   INFO_FLOW,
   STATE_COLORS,
 } from '@/core/constants';
+import { useSimulationControls } from '@/state/SimulationContext';
 
 const CHAIN = ['Смешивание', 'Компоненты', 'Сборка', 'Буфер', 'Вулканизация', 'Контроль', 'Склад'];
 const BUFFER_INDEX = 3;
@@ -18,6 +19,8 @@ const BUS_Y = 44;
 
 /** Material flow versus information flow, in the language of the shop floor. */
 export function FlowLegend() {
+  const { variantId, variants } = useSimulationControls();
+  const variant = variants.find((candidate) => candidate.id === variantId);
   const width = STEP * (CHAIN.length - 1) + BOX_WIDTH + 40;
 
   return (
@@ -104,6 +107,15 @@ export function FlowLegend() {
       >
         БУФЕР ЗАЩИЩАЕТ ОГРАНИЧЕНИЕ
       </text>
+
+      {variant ? (
+        <g>
+          <circle cx={width - 210} cy={BASE_Y + BOX_HEIGHT + 21} r={7} fill={variant.tokenColor} stroke={CANVAS_LINE} strokeWidth={1.2} />
+          <text x={width - 196} y={BASE_Y + BOX_HEIGHT + 26} fontSize={13} fontWeight={700} fill={CANVAS_INK}>
+            {variant.name}
+          </text>
+        </g>
+      ) : null}
     </svg>
   );
 }

@@ -25,7 +25,8 @@ const REFERENCE_MODES = new Set(['anatomy', 'materials']);
 
 /** The only part of the layout that reconciles on every animation frame. */
 function CanvasStage() {
-  const { scenario, tocMode, apsMode, demoMode } = useSimulationControls();
+  const { scenario, variantId, variants, tocMode, apsMode, demoMode } = useSimulationControls();
+  const variantColor = variants.find((variant) => variant.id === variantId)?.tokenColor;
   const { snapshot } = useSimulationFrame();
   const { kpi } = useSimulationKpi();
   const presentation = usePresentationDirector();
@@ -51,6 +52,7 @@ function CanvasStage() {
           tocMode={tocMode}
           informationFlow={apsMode}
           zones={CANVAS_ZONES}
+          variantColor={variantColor}
         />
       </div>
       {narration ? (

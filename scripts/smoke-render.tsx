@@ -147,6 +147,11 @@ for (const node of scenario.nodes) {
 for (const label of ['Выработка', 'Время цикла', 'НЗП', 'Очередь', 'Загрузка', 'Узкое место', 'Готовые шины']) {
   expect(text.includes(label), `KPI card "${label}" is missing`);
 }
+for (const label of ['Стадии шины', 'Зелёная', 'Вулканизированная']) {
+  expect(text.includes(label), `appearance-stage legend is missing "${label}"`);
+}
+// Summer has no studding params, so the «Ошиповка» group must not render at all.
+expect(!text.includes('Ошиповка'), 'the empty «Ошиповка» parameter group must not render for summer');
 for (const control of ['Пуск', 'Шаг', 'Сброс', 'Показать ТОС', 'Показать APS']) {
   expect(
     container.querySelector(`[aria-label="${control}"]`) !== null,
@@ -159,6 +164,56 @@ expect(
 );
 expect(container.querySelectorAll('button').length === 0, 'native <button> elements must not be used');
 expect(container.querySelectorAll('input').length === 0, 'native <input> elements must not be used');
+
+// Switching to the studded variant reveals the studding line and its slider group.
+press('Шипы');
+await wait(250);
+for (const label of ['Время ошиповки', 'Автоматы ошиповки', 'Отлёжка']) {
+  expect(
+    container.querySelector(`[aria-label="${label}"]`) !== null,
+    `studding slider "${label}" is missing for the studded variant`,
+  );
+}
+const studdedText = container.textContent ?? '';
+for (const node of ['Ошиповка', 'Контроль шипов', 'Отлёжка', 'Ошипованная']) {
+  expect(studdedText.includes(node), `studded canvas/legend is missing "${node}"`);
+}
+press('Лето');
+await wait(150);
+
+// Product-variant token: green → cured → studded, rim tinted by the variant.
+const { TireToken } = await import('../src/components/canvas/TireToken');
+const VARIANT_RIM = '#5D7A94';
+const tokenHosts = [0, 1, 2].map((stage) => {
+  const host = dom.window.document.createElement('div');
+  createRoot(host).render(
+    createElement(
+      'svg',
+      null,
+      createElement(TireToken, {
+        x: 0,
+        y: 0,
+        stage,
+        variantColor: VARIANT_RIM,
+        moving: false,
+        highlighted: false,
+        dimmed: false,
+      }),
+    ),
+  );
+  return host;
+});
+await wait(120);
+const [greenToken, curedToken, studdedToken] = tokenHosts.map((host) => host.innerHTML);
+const studCount = (svg: string) => (svg.match(/r="1\.5"/g) ?? []).length;
+const treadCount = (svg: string) => (svg.match(/rotate\(/g) ?? []).length;
+expect(treadCount(greenToken) === 0 && studCount(greenToken) === 0, 'green tire must be smooth (no tread, no studs)');
+expect(treadCount(curedToken) >= 3 && studCount(curedToken) === 0, 'cured tire must show tread and no studs');
+expect(studCount(studdedToken) === 8, `studded tire must show 8 studs, got ${studCount(studdedToken)}`);
+expect(
+  greenToken.includes(VARIANT_RIM) && studdedToken.includes(VARIANT_RIM),
+  'token rim must use the variant colour',
+);
 
 root.unmount();
 
