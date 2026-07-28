@@ -1,24 +1,16 @@
-import {
-  HISTORY_INTERVAL_MINUTES,
-  HISTORY_MAX_POINTS,
-  TICK_EPSILON,
-  TICK_MINUTES,
-  UTILIZATION_TAU_MINUTES,
-} from './constants';
-import { throughputPerHour } from './metrics';
+import { TICK_EPSILON, TICK_MINUTES, UTILIZATION_TAU_MINUTES } from './constants';
 import { Narrator } from './narrator';
 import {
   configureNode,
-  countQueued,
-  countWip,
   createNodeRuntime,
+  recordHistory,
   type EngineState,
   type NodeRuntime,
   type Unit,
 } from './runtime';
-import { changeoverFor, ReleasePlanCursor, routeFor } from './scheduling';
+import { changeoverFor, pickIndex, ReleasePlanCursor, routeFor } from './scheduling';
 import { buildSnapshot } from './snapshot';
-import type { Params, ScenarioDef, Snapshot } from './types';
+import type { Params, ScenarioDef, SchedulingPolicy, Snapshot } from './types';
 
 /**
  * Deterministic, fixed-step factory simulation.
@@ -38,6 +30,7 @@ export class FactoryEngine {
   private nextHistoryAt = 0;
   private readonly narrator: Narrator;
   private readonly releasePlan: ReleasePlanCursor;
+  private policy: SchedulingPolicy = 'fifo';
   /** Whole ticks executed so far; the clock is derived from this integer. */
   private ticks = 0;
   /** Total minutes requested, so partial frames accumulate without drift. */
@@ -88,6 +81,11 @@ export class FactoryEngine {
     return { ...this.params };
   }
 
+  /** Switches the queue-selection policy; seek() replays with the current one. */
+  setSchedulingPolicy(policy: SchedulingPolicy): void {
+    this.policy = policy;
+  }
+
   /** Applies tunables to the running model without discarding current state. */
   applyParams(params: Params): void {
     this.params = { ...params };
@@ -126,7 +124,7 @@ export class FactoryEngine {
       this.updateNode(this.state.nodes.get(this.order[i])!, dt);
     }
     this.release();
-    this.recordHistory();
+    this.nextHistoryAt = recordHistory(this.state, this.nextHistoryAt);
   }
 
   private updateMovers(dt: number): void {
@@ -184,10 +182,12 @@ export class FactoryEngine {
         }
       }
     }
+    const campaignSize = this.params.campaignSize;
     for (let slot = 0; slot < node.capacity && slot < node.slots.length; slot += 1) {
       if (node.slots[slot] !== null) continue;
-      const unitId = node.queue.shift();
-      if (unitId === undefined) break;
+      const idx = pickIndex(node, this.policy, campaignSize, (id) => this.state.units.get(id)!.productId);
+      if (idx < 0) break;
+      const unitId = node.queue.splice(idx, 1)[0];
       const unit = this.state.units.get(unitId)!;
       const retool = changeoverFor(node, slot, unit.productId);
       node.slotForm[slot] = unit.productId;
@@ -280,19 +280,4 @@ export class FactoryEngine {
     to.reserved += 1;
   }
 
-  private recordHistory(): void {
-    while (this.state.time >= this.nextHistoryAt) {
-      this.state.history.push({
-        t: this.nextHistoryAt,
-        throughput: throughputPerHour(
-          this.state.completionTimes,
-          Math.max(this.state.time, TICK_MINUTES),
-        ),
-        wip: countWip(this.state.units),
-        queue: countQueued(this.state.nodes),
-      });
-      if (this.state.history.length > HISTORY_MAX_POINTS) this.state.history.shift();
-      this.nextHistoryAt += HISTORY_INTERVAL_MINUTES;
-    }
-  }
 }

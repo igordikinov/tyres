@@ -1,4 +1,5 @@
-import { TICK_MINUTES } from './constants';
+import { HISTORY_INTERVAL_MINUTES, HISTORY_MAX_POINTS, TICK_MINUTES } from './constants';
+import { throughputPerHour } from './metrics';
 import type { HistoryPoint, NodeDef, Params, ResourceState, ScenarioDef, UnitView, VariantId } from './types';
 
 /** One physical unit travelling through the factory. */
@@ -35,6 +36,9 @@ export interface NodeRuntime {
   slotChangeover: number[];
   /** Total minutes spent retooling, for the changeover-share KPI. */
   changeoverAccrued: number;
+  /** Active campaign product type and how many more units it may still pull. */
+  campaignType: VariantId | null;
+  campaignRemaining: number;
 }
 
 /** Everything the snapshot builder needs, without touching the engine class. */
@@ -68,6 +72,8 @@ export function createNodeRuntime(def: NodeDef): NodeRuntime {
     slotForm: new Array<VariantId | null>(def.capacity).fill(null),
     slotChangeover: new Array<number>(def.capacity).fill(0),
     changeoverAccrued: 0,
+    campaignType: null,
+    campaignRemaining: 0,
   };
 }
 
@@ -101,4 +107,20 @@ export function countQueued(nodes: Map<string, NodeRuntime>): number {
   let queued = 0;
   for (const node of nodes.values()) queued += node.queue.length;
   return queued;
+}
+
+/** Samples the throughput/WIP/queue history up to the clock; returns the next due time. */
+export function recordHistory(state: EngineState, nextHistoryAt: number): number {
+  let at = nextHistoryAt;
+  while (state.time >= at) {
+    state.history.push({
+      t: at,
+      throughput: throughputPerHour(state.completionTimes, Math.max(state.time, TICK_MINUTES)),
+      wip: countWip(state.units),
+      queue: countQueued(state.nodes),
+    });
+    if (state.history.length > HISTORY_MAX_POINTS) state.history.shift();
+    at += HISTORY_INTERVAL_MINUTES;
+  }
+  return at;
 }

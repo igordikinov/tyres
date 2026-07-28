@@ -20,7 +20,8 @@
     "studdingTime": 2,
     "studdingCount": 1,
     "restMinutes": 10,
-    "changeoverMinutes": 60
+    "changeoverMinutes": 60,
+    "campaignSize": 6
   },
   "optimisedParams": {
     "pressCount": 8,

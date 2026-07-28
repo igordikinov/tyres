@@ -26,6 +26,9 @@ export type MachineKind =
 
 export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved' | 'changeover';
 
+/** Order in which a resource pulls units from its queue in the mixed flow. */
+export type SchedulingPolicy = 'fifo' | 'campaigns';
+
 /** Tunable parameters exposed through the Parameter Panel. */
 export type ParamKey =
   | 'mixerTime'
@@ -39,7 +42,8 @@ export type ParamKey =
   | 'studdingTime'
   | 'studdingCount'
   | 'restMinutes'
-  | 'changeoverMinutes';
+  | 'changeoverMinutes'
+  | 'campaignSize';
 
 export type Params = Record<ParamKey, number>;
 
@@ -246,6 +250,8 @@ export interface NodeView {
   processed: number;
   processMinutes: number;
   isBottleneck: boolean;
+  /** Total minutes this resource has spent retooling (changeover), for KPIs. */
+  changeoverMinutes?: number;
 }
 
 export interface Kpi {

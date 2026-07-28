@@ -17,6 +17,7 @@ import {
   checkReleasePlan,
   checkRouting,
   checkScenarioVariants,
+  checkSchedulingPolicy,
   checkUnitProductId,
   checkVariantConstants,
   checkVariantDeterminism,
@@ -147,6 +148,7 @@ failures.push(...checkUnitProductId());
 failures.push(...checkReleasePlan());
 failures.push(...checkRouting());
 failures.push(...checkChangeover());
+failures.push(...checkSchedulingPolicy());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

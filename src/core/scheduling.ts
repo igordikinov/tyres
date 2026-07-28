@@ -1,5 +1,5 @@
 import type { NodeRuntime } from './runtime';
-import type { NodeDef, ReleaseOrder, VariantId } from './types';
+import type { NodeDef, ReleaseOrder, SchedulingPolicy, VariantId } from './types';
 
 /** Next node id for a unit leaving `def`, honouring per-product route overrides. */
 export function routeFor(def: NodeDef, productId: VariantId | null): string | null {
@@ -16,6 +16,31 @@ export function changeoverFor(node: NodeRuntime, slot: number, productId: Varian
   if (node.changeoverMinutes <= 0) return 0;
   const form = node.slotForm[slot];
   return form !== null && form !== productId ? node.changeoverMinutes : 0;
+}
+
+/**
+ * Queue index of the unit a free slot should start. FIFO takes the front;
+ * campaigns keep pulling the current product type (avoiding changeovers) until
+ * the campaign size is spent or that type runs out, then start a fresh campaign.
+ */
+export function pickIndex(
+  node: NodeRuntime,
+  policy: SchedulingPolicy,
+  campaignSize: number,
+  productOf: (unitId: number) => VariantId | null,
+): number {
+  if (node.queue.length === 0) return -1;
+  if (policy === 'fifo') return 0;
+  if (node.campaignRemaining > 0 && node.campaignType) {
+    const i = node.queue.findIndex((id) => productOf(id) === node.campaignType);
+    if (i >= 0) {
+      node.campaignRemaining -= 1;
+      return i;
+    }
+  }
+  node.campaignType = productOf(node.queue[0]);
+  node.campaignRemaining = Math.max(1, Math.round(campaignSize)) - 1;
+  return 0;
 }
 
 /**

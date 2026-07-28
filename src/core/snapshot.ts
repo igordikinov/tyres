@@ -52,6 +52,7 @@ export function buildSnapshot(state: EngineState): Snapshot {
       processed: node.processed,
       processMinutes: node.processMinutes,
       isBottleneck: kpi.bottleneckId === stat.id,
+      changeoverMinutes: node.changeoverAccrued,
     };
   }
 
