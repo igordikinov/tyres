@@ -221,6 +221,11 @@ for (const label of ['Межсезонье', 'Пик зимы', 'FIFO', 'Кам�
 for (const slider of ['Переналадка формы', 'Размер кампании']) {
   expect(container.querySelector(`[aria-label="${slider}"]`) !== null, `mixed-flow slider "${slider}" is missing`);
 }
+press('Пик зимы');
+await wait(150);
+expect((container.textContent ?? '').includes('10 / 40 / 50'), 'switching to the peak-winter plan did not update the mix ratio');
+press('Кампании');
+await wait(150);
 press('Лето');
 await wait(150);
 

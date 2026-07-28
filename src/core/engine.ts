@@ -202,7 +202,10 @@ export class FactoryEngine {
       if (retool > 0) retooling += 1;
       else working += 1;
     }
-    this.trackUtilization(node, working, dt);
+    // A retooling slot is busy (occupied, just not producing), so it counts
+    // toward utilisation — that is how a changeover-choked press becomes the
+    // constraint the TOC view highlights.
+    this.trackUtilization(node, working + retooling, dt);
     // idle = work incoming (queue/reserved); starved = upstream route ran dry.
     const awaiting = node.queue.length > 0 || node.reserved > 0;
     node.state =

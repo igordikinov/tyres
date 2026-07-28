@@ -507,6 +507,28 @@ export function checkKpiByType(): string[] {
   return failures;
 }
 
+/**
+ * With changeovers eroding effective press capacity, TOC must still identify a
+ * constraint in the mixed flow, and the press must actually accrue changeover
+ * time (spec §5.4.4 — the constraint accounting includes retooling).
+ */
+export function checkMixedConstraint(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  engine.advance(300);
+  const snap = engine.getSnapshot();
+  const press = snap.nodes.press;
+  if (!(press && (press.changeoverMinutes ?? 0) > 0)) {
+    failures.push('the mixed press should accrue changeover time');
+  }
+  // With changeovers eroding the press, TOC must flag it — not an upstream node.
+  if (snap.kpi.bottleneckId !== 'press') {
+    failures.push(`mixed constraint should be the press once changeovers bite, got "${String(snap.kpi.bottleneckId)}"`);
+  }
+  return failures;
+}
+
 /** Variant-related constants live in constants.ts and nowhere else (tyre-ag5.14). */
 export function checkVariantConstants(): string[] {
   const failures: string[] = [];
