@@ -14,6 +14,7 @@ import {
   checkAppearanceStage,
   checkBottleneckMigration,
   checkChangeover,
+  checkKpiByType,
   checkReleasePlan,
   checkRouting,
   checkScenarioVariants,
@@ -149,6 +150,7 @@ failures.push(...checkReleasePlan());
 failures.push(...checkRouting());
 failures.push(...checkChangeover());
 failures.push(...checkSchedulingPolicy());
+failures.push(...checkKpiByType());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

@@ -1,10 +1,13 @@
 import { Panel } from '@/components/ui/Panel';
+import { VARIANT_COLORS } from '@/core/constants';
 import { formatDuration, formatNumber, formatPercent } from '@/core/scenario';
+import type { VariantId } from '@/core/types';
 import { useSimulationControls, useSimulationKpi } from '@/state/SimulationContext';
 import { KpiCard } from './KpiCard';
 import { StateLegend } from './StateLegend';
 
 const UTILIZATION_TARGET = 1;
+const TYPE_LABELS: Record<VariantId, string> = { summer: 'Лето', winter: 'Зима', 'winter-studded': 'Шипы' };
 
 export function KpiSidebar() {
   const { scenario } = useSimulationControls();
@@ -60,6 +63,21 @@ export function KpiSidebar() {
           />
         </div>
       </Panel>
+
+      {kpi.byType ? (
+        <Panel eyebrow="Смешанный поток" title="Выработка по типам" className="shrink-0" bodyClassName="p-3">
+          <ul className="flex flex-col gap-1.5">
+            {kpi.byType.map((type) => (
+              <li key={type.productId} className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: VARIANT_COLORS[type.productId] }} />
+                <span className="text-[12px] font-semibold text-ink-700">{TYPE_LABELS[type.productId]}</span>
+                <span className="numeric ml-auto text-[13px] font-bold text-ink-900">{formatNumber(type.completed)}</span>
+                <span className="text-[10px] text-ink-400">гот · НЗП {formatNumber(type.wip)}</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      ) : null}
 
       <Panel eyebrow="Легенда" title="Состояния ресурсов" className="shrink-0">
         <StateLegend />

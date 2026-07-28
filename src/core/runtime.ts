@@ -50,6 +50,8 @@ export interface EngineState {
   completionTimes: number[];
   leadTimes: number[];
   completed: number;
+  /** Completions counted per product type, for the mixed-flow KPIs. */
+  completedByType: Record<string, number>;
   released: number;
   history: HistoryPoint[];
   narration: string;

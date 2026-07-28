@@ -55,7 +55,7 @@ export class FactoryEngine {
       time: 0,
       nodes: new Map<string, NodeRuntime>(),
       units: new Map<number, Unit>(),
-      completionTimes: [], leadTimes: [], completed: 0, released: 0,
+      completionTimes: [], leadTimes: [], completed: 0, completedByType: {}, released: 0,
       history: [], narration: '', narrationAt: 0,
     };
   }
@@ -138,6 +138,8 @@ export class FactoryEngine {
       if (target.def.kind === 'sink') {
         unit.phase = 'done';
         this.state.completed += 1;
+        const pid = unit.productId ?? 'all';
+        this.state.completedByType[pid] = (this.state.completedByType[pid] ?? 0) + 1;
         this.state.completionTimes.push(this.state.time);
         this.state.leadTimes.push(this.state.time - unit.createdAt);
         this.narrator.announce(target.def, this.state.time, this.state);

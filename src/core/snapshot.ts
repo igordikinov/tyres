@@ -1,6 +1,9 @@
 import { computeKpi, type ResourceStat } from './metrics';
 import { countWip, type EngineState } from './runtime';
-import type { NodeView, Snapshot, UnitView } from './types';
+import type { NodeView, Snapshot, UnitView, VariantId } from './types';
+
+/** Variant display order for the per-type KPI. */
+const TYPE_ORDER: VariantId[] = ['summer', 'winter', 'winter-studded'];
 
 /** Flattens the runtime into the shape the metrics module expects. */
 export function buildResourceStats(state: EngineState): ResourceStat[] {
@@ -94,6 +97,22 @@ export function buildSnapshot(state: EngineState): Snapshot {
       appearanceStage: stageAt(unit.nodeId),
       productId: unit.productId ?? undefined,
     });
+  }
+
+  // Per-type output/WIP, only meaningful once the flow carries more than one type.
+  const wipByType: Record<string, number> = {};
+  for (const unit of state.units.values()) {
+    if (unit.phase !== 'done' && unit.productId) wipByType[unit.productId] = (wipByType[unit.productId] ?? 0) + 1;
+  }
+  const typeIds = new Set(
+    [...Object.keys(state.completedByType), ...Object.keys(wipByType)].filter((id) => id !== 'all'),
+  );
+  if (typeIds.size > 1) {
+    kpi.byType = TYPE_ORDER.filter((id) => typeIds.has(id)).map((id) => ({
+      productId: id,
+      completed: state.completedByType[id] ?? 0,
+      wip: wipByType[id] ?? 0,
+    }));
   }
 
   return {

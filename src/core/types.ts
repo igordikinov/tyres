@@ -265,6 +265,8 @@ export interface Kpi {
   bottleneckUtilization: number;
   completed: number;
   released: number;
+  /** Per-product-type output and WIP, for the mixed flow. */
+  byType?: Array<{ productId: VariantId; completed: number; wip: number }>;
 }
 
 export interface HistoryPoint {

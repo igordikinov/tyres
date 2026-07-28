@@ -485,6 +485,28 @@ export function checkSchedulingPolicy(): string[] {
   return failures;
 }
 
+/** The mixed flow reports output per product type; the parts sum to the whole (tyre-kkz.6). */
+export function checkKpiByType(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  engine.advance(HORIZON_MINUTES);
+  const kpi = engine.getSnapshot().kpi;
+  if (!kpi.byType) {
+    failures.push('the mixed flow should expose kpi.byType');
+    return failures;
+  }
+  const sum = kpi.byType.reduce((total, type) => total + type.completed, 0);
+  if (sum !== kpi.completed) {
+    failures.push(`per-type completions ${sum} must sum to the total ${kpi.completed}`);
+  }
+  const types = kpi.byType.map((type) => type.productId);
+  for (const id of ['summer', 'winter', 'winter-studded'] as VariantId[]) {
+    if (!types.includes(id)) failures.push(`kpi.byType is missing "${id}"`);
+  }
+  return failures;
+}
+
 /** Variant-related constants live in constants.ts and nowhere else (tyre-ag5.14). */
 export function checkVariantConstants(): string[] {
   const failures: string[] = [];
