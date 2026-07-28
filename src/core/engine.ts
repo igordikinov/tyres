@@ -8,6 +8,7 @@ import {
 import { throughputPerHour } from './metrics';
 import { Narrator } from './narrator';
 import {
+  configureNode,
   countQueued,
   countWip,
   createNodeRuntime,
@@ -15,7 +16,7 @@ import {
   type NodeRuntime,
   type Unit,
 } from './runtime';
-import { ReleasePlanCursor, routeFor } from './scheduling';
+import { changeoverFor, ReleasePlanCursor, routeFor } from './scheduling';
 import { buildSnapshot } from './snapshot';
 import type { Params, ScenarioDef, Snapshot } from './types';
 
@@ -90,18 +91,7 @@ export class FactoryEngine {
   /** Applies tunables to the running model without discarding current state. */
   applyParams(params: Params): void {
     this.params = { ...params };
-    for (const node of this.state.nodes.values()) {
-      const { timeParam, capacityParam, queueParam } = node.def;
-      if (timeParam) node.processMinutes = Math.max(this.params[timeParam], TICK_MINUTES);
-      if (queueParam) node.queueCapacity = Math.round(this.params[queueParam]);
-      if (capacityParam) {
-        node.capacity = Math.max(1, Math.round(this.params[capacityParam]));
-        while (node.slots.length < node.capacity) node.slots.push(null);
-        while (node.slots.length > node.capacity && node.slots[node.slots.length - 1] === null) {
-          node.slots.pop();
-        }
-      }
-    }
+    for (const node of this.state.nodes.values()) configureNode(node, this.params);
   }
 
   /** Rebuilds the run from t = 0 up to `target`, used by the timeline. */
@@ -171,14 +161,19 @@ export class FactoryEngine {
 
     let working = 0;
     let blocked = 0;
+    let retooling = 0;
     for (let slot = 0; slot < node.slots.length; slot += 1) {
       const unitId = node.slots[slot];
       if (unitId === null) continue;
       const unit = this.state.units.get(unitId)!;
       const wasDone = unit.elapsed >= unit.duration;
       if (!wasDone) {
+        const before = unit.elapsed;
         unit.elapsed = Math.min(unit.duration, unit.elapsed + dt);
-        working += 1;
+        if (before < node.slotChangeover[slot]) {
+          retooling += 1;
+          node.changeoverAccrued += Math.min(unit.elapsed, node.slotChangeover[slot]) - before;
+        } else working += 1;
       }
       if (unit.elapsed >= unit.duration) {
         if (this.tryDepart(node, unitId)) {
@@ -194,18 +189,22 @@ export class FactoryEngine {
       const unitId = node.queue.shift();
       if (unitId === undefined) break;
       const unit = this.state.units.get(unitId)!;
+      const retool = changeoverFor(node, slot, unit.productId);
+      node.slotForm[slot] = unit.productId;
+      node.slotChangeover[slot] = retool;
       unit.phase = 'service';
       unit.slotIndex = slot;
       unit.elapsed = 0;
-      unit.duration = node.processMinutes;
+      unit.duration = retool + node.processMinutes;
       node.slots[slot] = unitId;
-      working += 1;
+      if (retool > 0) retooling += 1;
+      else working += 1;
     }
     this.trackUtilization(node, working, dt);
     // idle = work incoming (queue/reserved); starved = upstream route ran dry.
     const awaiting = node.queue.length > 0 || node.reserved > 0;
     node.state =
-      blocked > 0 ? 'blocked' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
+      blocked > 0 ? 'blocked' : retooling > 0 ? 'changeover' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
   }
 
   private updateBuffer(node: NodeRuntime, dt: number): void {

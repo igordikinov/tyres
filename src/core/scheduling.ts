@@ -1,9 +1,21 @@
+import type { NodeRuntime } from './runtime';
 import type { NodeDef, ReleaseOrder, VariantId } from './types';
 
 /** Next node id for a unit leaving `def`, honouring per-product route overrides. */
 export function routeFor(def: NodeDef, productId: VariantId | null): string | null {
   const routed = def.routes && productId ? def.routes[productId] : undefined;
   return routed !== undefined ? routed : def.next;
+}
+
+/**
+ * Minutes of mould changeover before a slot can start a unit of `productId`.
+ * Zero when the node never retools, when the slot is empty (first install), or
+ * when the mould already matches.
+ */
+export function changeoverFor(node: NodeRuntime, slot: number, productId: VariantId | null): number {
+  if (node.changeoverMinutes <= 0) return 0;
+  const form = node.slotForm[slot];
+  return form !== null && form !== productId ? node.changeoverMinutes : 0;
 }
 
 /**

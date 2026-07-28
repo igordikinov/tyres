@@ -19,7 +19,8 @@
     "bufferCapacity": 40,
     "studdingTime": 2,
     "studdingCount": 1,
-    "restMinutes": 10
+    "restMinutes": 10,
+    "changeoverMinutes": 60
   },
   "optimisedParams": {
     "pressCount": 8,

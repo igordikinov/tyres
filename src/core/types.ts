@@ -24,7 +24,7 @@ export type MachineKind =
   | 'studcheck'
   | 'reststack';
 
-export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved';
+export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved' | 'changeover';
 
 /** Tunable parameters exposed through the Parameter Panel. */
 export type ParamKey =
@@ -38,7 +38,8 @@ export type ParamKey =
   | 'bufferCapacity'
   | 'studdingTime'
   | 'studdingCount'
-  | 'restMinutes';
+  | 'restMinutes'
+  | 'changeoverMinutes';
 
 export type Params = Record<ParamKey, number>;
 
@@ -85,6 +86,8 @@ export interface NodeDef {
   capacityParam?: ParamKey;
   /** Parameter that drives `queueCapacity`. */
   queueParam?: ParamKey;
+  /** Parameter driving the mould-changeover time when the product type switches. */
+  changeoverParam?: ParamKey;
   /** Units leaving this node change appearance (green tire → cured tire). */
   transformsAppearance?: boolean;
   narration?: string;

@@ -1,4 +1,5 @@
-import type { HistoryPoint, NodeDef, ResourceState, ScenarioDef, UnitView, VariantId } from './types';
+import { TICK_MINUTES } from './constants';
+import type { HistoryPoint, NodeDef, Params, ResourceState, ScenarioDef, UnitView, VariantId } from './types';
 
 /** One physical unit travelling through the factory. */
 export interface Unit {
@@ -26,6 +27,14 @@ export interface NodeRuntime {
   utilization: number;
   processed: number;
   state: ResourceState;
+  /** Changeover time when the product type switches; 0 when the node never retools. */
+  changeoverMinutes: number;
+  /** Installed mould form per slot (null before the first unit). */
+  slotForm: Array<VariantId | null>;
+  /** Retool time prepended to the current unit's service, per slot (0 when none). */
+  slotChangeover: number[];
+  /** Total minutes spent retooling, for the changeover-share KPI. */
+  changeoverAccrued: number;
 }
 
 /** Everything the snapshot builder needs, without touching the engine class. */
@@ -55,7 +64,31 @@ export function createNodeRuntime(def: NodeDef): NodeRuntime {
     utilization: 0,
     processed: 0,
     state: 'idle',
+    changeoverMinutes: 0,
+    slotForm: new Array<VariantId | null>(def.capacity).fill(null),
+    slotChangeover: new Array<number>(def.capacity).fill(0),
+    changeoverAccrued: 0,
   };
+}
+
+/** Applies tunables to a node, growing/shrinking the parallel slot arrays. */
+export function configureNode(node: NodeRuntime, params: Params): void {
+  const { timeParam, capacityParam, queueParam, changeoverParam } = node.def;
+  if (timeParam) node.processMinutes = Math.max(params[timeParam], TICK_MINUTES);
+  if (queueParam) node.queueCapacity = Math.round(params[queueParam]);
+  if (changeoverParam) node.changeoverMinutes = Math.max(0, params[changeoverParam]);
+  if (!capacityParam) return;
+  node.capacity = Math.max(1, Math.round(params[capacityParam]));
+  while (node.slots.length < node.capacity) {
+    node.slots.push(null);
+    node.slotForm.push(null);
+    node.slotChangeover.push(0);
+  }
+  while (node.slots.length > node.capacity && node.slots[node.slots.length - 1] === null) {
+    node.slots.pop();
+    node.slotForm.pop();
+    node.slotChangeover.pop();
+  }
 }
 
 export function countWip(units: Map<number, Unit>): number {

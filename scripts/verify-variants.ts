@@ -22,7 +22,7 @@ import { HORIZON_MINUTES } from '../src/core/constants';
 import { FactoryEngine } from '../src/core/engine';
 import { RELEASE_PLANS } from '../src/core/releasePlans';
 import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveMixed, resolveVariant } from '../src/core/scenario';
-import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
+import type { ParamDef, ReleaseOrder, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 
 const REAL = scenarioJson as unknown as ScenarioDef;
@@ -51,7 +51,7 @@ function makeBase(): ScenarioDef {
       { id: 'insp', index: 2, name: 'Insp', subtitle: '', kind: 'process', machine: 'inspection', processMinutes: 1, capacity: 1, queueCapacity: 2, transportMinutes: 0, next: 'sink', x: 10, y: 0, dir: 1 },
       { id: 'sink', index: 3, name: 'W', subtitle: '', kind: 'sink', machine: 'warehouse', processMinutes: 0, capacity: 0, queueCapacity: 0, transportMinutes: 0, next: null, x: 20, y: 0, dir: 1 },
     ],
-    params: { mixerTime: 3, extruderTime: 2.5, assemblyTime: 2, pressTime: 15, inspectionTime: 1.5, pressCount: 4, batchSize: 1, bufferCapacity: 40, studdingTime: 2, studdingCount: 1, restMinutes: 10 },
+    params: { mixerTime: 3, extruderTime: 2.5, assemblyTime: 2, pressTime: 15, inspectionTime: 1.5, pressCount: 4, batchSize: 1, bufferCapacity: 40, studdingTime: 2, studdingCount: 1, restMinutes: 10, changeoverMinutes: 60 },
     paramDefs: [PARAM_DEF],
     optimisedParams: { pressCount: 8 },
     construction: [],
@@ -426,6 +426,33 @@ export function checkRouting(): string[] {
   const b = replay.getSnapshot().kpi;
   if (a.completed !== b.completed || a.wip !== b.wip) {
     failures.push(`mixed flow diverges live vs seek(): completed ${a.completed}/${b.completed}, wip ${a.wip}/${b.wip}`);
+  }
+  return failures;
+}
+
+/**
+ * Presses retool when the next unit needs a different mould (tyre-kkz.4): a
+ * mixed plan must drive the press into the 'changeover' state, while a
+ * single-type plan never does — no type switch, no changeover.
+ */
+export function checkChangeover(): string[] {
+  const failures: string[] = [];
+
+  const sawChangeover = (plan: ReleaseOrder[]): boolean => {
+    const scenario: ScenarioDef = { ...resolveMixed(REAL, plan) };
+    const engine = new FactoryEngine(scenario, baselineParams(scenario));
+    for (let t = 0; t < 300; t += 1) {
+      engine.advance(1);
+      if (engine.getSnapshot().nodes.press?.state === 'changeover') return true;
+    }
+    return false;
+  };
+
+  if (!sawChangeover(RELEASE_PLANS.offseason.plan)) {
+    failures.push('the press never retooled under a mixed plan — changeover not applied');
+  }
+  if (sawChangeover([{ variantId: 'summer', qty: 200 }])) {
+    failures.push('the press retooled under a single-type plan — changeover should not occur');
   }
   return failures;
 }

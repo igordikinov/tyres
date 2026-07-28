@@ -81,11 +81,14 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
  */
 export function resolveMixed(scenario: ScenarioDef, releasePlan: ReleaseOrder[]): ScenarioDef {
   const studded = resolveVariant(scenario, 'winter-studded');
-  const nodes = studded.nodes.map((node) =>
-    node.id === 'inspection'
-      ? { ...node, next: 'warehouse', routes: { 'winter-studded': 'studding' } as NodeDef['routes'] }
-      : node,
-  );
+  const nodes = studded.nodes.map((node) => {
+    if (node.id === 'inspection') {
+      return { ...node, next: 'warehouse', routes: { 'winter-studded': 'studding' } as NodeDef['routes'] };
+    }
+    // The vulcanisation press carries a mould that must be changed per product.
+    if (node.id === 'press') return { ...node, changeoverParam: 'changeoverMinutes' as NodeDef['changeoverParam'] };
+    return node;
+  });
   return { ...studded, nodes, productId: undefined, releasePlan, product: 'Смешанный поток' };
 }
 
