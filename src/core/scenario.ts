@@ -39,6 +39,7 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
     nodes: scenario.nodes.map((node) => ({ ...node })),
   };
 
+  base.productId = variantId;
   const variant = variants?.find((candidate) => candidate.id === variantId);
   if (!variant) return base;
 

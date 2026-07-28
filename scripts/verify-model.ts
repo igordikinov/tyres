@@ -13,7 +13,9 @@ import scenarioJson from '../src/scenarios/tire-factory.json';
 import {
   checkAppearanceStage,
   checkBottleneckMigration,
+  checkReleasePlan,
   checkScenarioVariants,
+  checkUnitProductId,
   checkVariantConstants,
   checkVariantDeterminism,
   checkVariants,
@@ -139,6 +141,8 @@ failures.push(...checkScenarioVariants());
 failures.push(...checkVariantDeterminism());
 failures.push(...checkAppearanceStage());
 failures.push(...checkBottleneckMigration());
+failures.push(...checkUnitProductId());
+failures.push(...checkReleasePlan());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

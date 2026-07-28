@@ -20,6 +20,7 @@ import {
 } from '../src/core/constants';
 import { HORIZON_MINUTES } from '../src/core/constants';
 import { FactoryEngine } from '../src/core/engine';
+import { RELEASE_PLANS } from '../src/core/releasePlans';
 import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveVariant } from '../src/core/scenario';
 import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
@@ -317,6 +318,66 @@ export function checkBottleneckMigration(): string[] {
     failures.push(`studded lead time (${def.kpi.cycleTimeMinutes.toFixed(0)}) must exceed summer (${summerCycle.toFixed(0)})`);
   }
 
+  return failures;
+}
+
+/**
+ * Every unit carries the product type it belongs to (tyre-kkz.1). With a single
+ * resolved variant, every in-flight unit reports that variant's id — the basis
+ * for per-type colouring, routing and changeovers in the mixed flow.
+ */
+export function checkUnitProductId(): string[] {
+  const failures: string[] = [];
+  for (const id of ['summer', 'winter-studded'] as VariantId[]) {
+    const sc = resolveVariant(REAL, id);
+    if (sc.productId !== id) failures.push(`resolveVariant must tag scenario.productId="${id}", got "${String(sc.productId)}"`);
+    const engine = new FactoryEngine(sc, baselineParams(sc));
+    engine.advance(90);
+    const units = engine.getSnapshot().units;
+    if (units.length === 0) {
+      failures.push(`variant "${id}" had no in-flight units to check productId`);
+      continue;
+    }
+    const mismatched = units.filter((unit) => unit.productId !== id).length;
+    if (mismatched > 0) failures.push(`variant "${id}": ${mismatched}/${units.length} units have the wrong productId`);
+  }
+  return failures;
+}
+
+/**
+ * A releasePlan drives a deterministic, RNG-free product mix (tyre-kkz.2): the
+ * n-th released unit's type follows the cyclic plan pattern, and two runs of the
+ * same plan release the same sequence.
+ */
+export function checkReleasePlan(): string[] {
+  const failures: string[] = [];
+  const plan = RELEASE_PLANS.offseason.plan; // summer×5, winter×3, studded×2
+  const pattern = plan.flatMap((order) => Array<VariantId>(order.qty).fill(order.variantId));
+  const scenario: ScenarioDef = { ...resolveVariant(REAL, 'winter-studded'), releasePlan: plan };
+
+  const run = (): Map<number, VariantId | undefined> => {
+    const engine = new FactoryEngine(scenario, baselineParams(scenario));
+    const seen = new Map<number, VariantId | undefined>();
+    for (let t = 0; t < 120; t += 1) {
+      engine.advance(1);
+      for (const unit of engine.getSnapshot().units) if (!seen.has(unit.id)) seen.set(unit.id, unit.productId);
+    }
+    return seen;
+  };
+
+  const seen = run();
+  if (seen.size < 12) failures.push(`releasePlan should release many units, saw ${seen.size}`);
+  let offPattern = 0;
+  for (const [id, productId] of seen) {
+    const expected = pattern[(id - 1) % pattern.length];
+    if (productId !== expected) offPattern += 1;
+  }
+  if (offPattern > 0) failures.push(`releasePlan: ${offPattern}/${seen.size} units do not follow the plan pattern`);
+
+  const seen2 = run();
+  if (seen2.size !== seen.size || [...seen].some(([id, pid]) => seen2.get(id) !== pid)) {
+    failures.push('releasePlan is not deterministic across runs');
+  }
   return failures;
 }
 

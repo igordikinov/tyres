@@ -1,4 +1,4 @@
-import type { HistoryPoint, NodeDef, ResourceState, ScenarioDef, UnitView } from './types';
+import type { HistoryPoint, NodeDef, ResourceState, ScenarioDef, UnitView, VariantId } from './types';
 
 /** One physical unit travelling through the factory. */
 export interface Unit {
@@ -10,6 +10,8 @@ export interface Unit {
   elapsed: number;
   duration: number;
   slotIndex: number;
+  /** Product variant this unit belongs to (null when the scenario is untyped). */
+  productId: VariantId | null;
 }
 
 /** Mutable runtime state of a single resource, buffer, source or sink. */

@@ -136,6 +136,15 @@ export interface PresentationChapter {
 /** Product variants share one line; each is a data patch over the scenario. */
 export type VariantId = 'summer' | 'winter' | 'winter-studded';
 
+/** One production order in a release plan; the plan repeats cyclically. */
+export interface ReleaseOrder {
+  variantId: VariantId;
+  /** Units of this type released before advancing to the next order. */
+  qty: number;
+  /** Optional due time in shift minutes, for OTIF (Phase 2 KPIs). */
+  dueMinutes?: number;
+}
+
 /**
  * A variant is a thin data layer over the base scenario. resolveVariant() folds
  * it into a plain ScenarioDef, so the engine, canvas and KPIs never see this.
@@ -195,6 +204,10 @@ export interface ScenarioDef {
   presentation?: PresentationChapter[];
   /** Product variants selectable in the Header; resolved away before the engine runs. */
   variants?: VariantDef[];
+  /** Which variant this resolved scenario represents; stamped on released units. */
+  productId?: VariantId;
+  /** Deterministic mixed-flow release sequence (Phase 2); repeats cyclically. */
+  releasePlan?: ReleaseOrder[];
 }
 
 export interface UnitView {
@@ -210,6 +223,8 @@ export interface UnitView {
   createdAt: number;
   /** Count of transformsAppearance nodes passed: 0 green → 1 cured → 2 studded. */
   appearanceStage?: number;
+  /** Product variant this unit belongs to, for per-type colouring in the mixed flow. */
+  productId?: VariantId;
 }
 
 export interface NodeView {
