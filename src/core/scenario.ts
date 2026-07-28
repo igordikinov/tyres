@@ -1,6 +1,6 @@
 import rawTireFactory from '@/scenarios/tire-factory.json';
 import { SHIFT_START_HOUR } from './constants';
-import type { NodeDef, Params, ReleaseOrder, ScenarioDef, VariantDef, VariantId } from './types';
+import type { NodeDef, ParamDef, Params, ReleaseOrder, ScenarioDef, VariantDef, VariantId } from './types';
 
 /**
  * Scenarios are plain data. Adding a new industry means adding a JSON file,
@@ -89,7 +89,12 @@ export function resolveMixed(scenario: ScenarioDef, releasePlan: ReleaseOrder[])
     if (node.id === 'press') return { ...node, changeoverParam: 'changeoverMinutes' as NodeDef['changeoverParam'] };
     return node;
   });
-  return { ...studded, nodes, productId: undefined, releasePlan, product: 'Смешанный поток' };
+  const paramDefs: ParamDef[] = [
+    ...studded.paramDefs,
+    { key: 'changeoverMinutes', label: 'Переналадка формы', unit: 'мин', min: 15, max: 120, step: 5, group: 'mixed', hint: 'Время смены пресс-формы при переходе на другой тип шины' },
+    { key: 'campaignSize', label: 'Размер кампании', unit: 'шт', min: 2, max: 12, step: 1, group: 'mixed', hint: 'Сколько шин одного типа идёт подряд в режиме «Кампании»' },
+  ];
+  return { ...studded, nodes, paramDefs, productId: undefined, releasePlan, product: 'Смешанный поток' };
 }
 
 export function baselineParams(scenario: ScenarioDef): Params {

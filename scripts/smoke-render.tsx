@@ -211,6 +211,19 @@ await wait(150);
 press('Лето');
 await wait(150);
 
+// Mixed flow: the «Микс» switch reveals the plan/policy controls and its sliders.
+press('Микс');
+await wait(250);
+const mixedText = container.textContent ?? '';
+for (const label of ['Межсезонье', 'Пик зимы', 'FIFO', 'Кампании']) {
+  expect(mixedText.includes(label), `mixed-flow panel is missing the "${label}" control`);
+}
+for (const slider of ['Переналадка формы', 'Размер кампании']) {
+  expect(container.querySelector(`[aria-label="${slider}"]`) !== null, `mixed-flow slider "${slider}" is missing`);
+}
+press('Лето');
+await wait(150);
+
 // Presentation script now travels in scenario data; the director must run it.
 press('Презентация');
 await wait(400);

@@ -54,7 +54,7 @@ export interface ParamDef {
   min: number;
   max: number;
   step: number;
-  group: 'time' | 'capacity' | 'studding';
+  group: 'time' | 'capacity' | 'studding' | 'mixed';
   hint: string;
 }
 
