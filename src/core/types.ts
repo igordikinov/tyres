@@ -24,7 +24,10 @@ export type MachineKind =
   | 'studcheck'
   | 'reststack';
 
-export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved';
+export type ResourceState = 'idle' | 'working' | 'blocked' | 'starved' | 'changeover';
+
+/** Order in which a resource pulls units from its queue in the mixed flow. */
+export type SchedulingPolicy = 'fifo' | 'campaigns';
 
 /** Tunable parameters exposed through the Parameter Panel. */
 export type ParamKey =
@@ -38,7 +41,9 @@ export type ParamKey =
   | 'bufferCapacity'
   | 'studdingTime'
   | 'studdingCount'
-  | 'restMinutes';
+  | 'restMinutes'
+  | 'changeoverMinutes'
+  | 'campaignSize';
 
 export type Params = Record<ParamKey, number>;
 
@@ -49,7 +54,7 @@ export interface ParamDef {
   min: number;
   max: number;
   step: number;
-  group: 'time' | 'capacity' | 'studding';
+  group: 'time' | 'capacity' | 'studding' | 'mixed';
   hint: string;
 }
 
@@ -85,6 +90,8 @@ export interface NodeDef {
   capacityParam?: ParamKey;
   /** Parameter that drives `queueCapacity`. */
   queueParam?: ParamKey;
+  /** Parameter driving the mould-changeover time when the product type switches. */
+  changeoverParam?: ParamKey;
   /** Units leaving this node change appearance (green tire → cured tire). */
   transformsAppearance?: boolean;
   narration?: string;
@@ -243,6 +250,8 @@ export interface NodeView {
   processed: number;
   processMinutes: number;
   isBottleneck: boolean;
+  /** Total minutes this resource has spent retooling (changeover), for KPIs. */
+  changeoverMinutes?: number;
 }
 
 export interface Kpi {
@@ -256,6 +265,8 @@ export interface Kpi {
   bottleneckUtilization: number;
   completed: number;
   released: number;
+  /** Per-product-type output and WIP, for the mixed flow. */
+  byType?: Array<{ productId: VariantId; completed: number; wip: number }>;
 }
 
 export interface HistoryPoint {

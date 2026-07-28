@@ -7,6 +7,7 @@ import {
   CANVAS_ZONE_LINE,
   STATE_COLORS,
   STATION_HEIGHT,
+  VARIANT_COLORS,
   WAREHOUSE_VISUAL_CAPACITY,
   ZONE_PADDING,
 } from '@/core/constants';
@@ -180,7 +181,7 @@ export function ProductionCanvas({
             x={point.x}
             y={point.y}
             stage={unit.appearanceStage ?? 0}
-            variantColor={variantColor}
+            variantColor={unit.productId ? VARIANT_COLORS[unit.productId] : variantColor}
             moving={unit.phase === 'moving'}
             highlighted={unit.phase === 'service'}
             dimmed={isDimmed(unit.nodeId)}

@@ -63,6 +63,8 @@ export function Header() {
     variantId,
     variants,
     setVariant,
+    mixedMode,
+    setMixedMode,
     playing,
     speed,
     setSpeed,
@@ -78,11 +80,14 @@ export function Header() {
     setApsMode,
   } = useSimulationControls();
 
-  const activeVariant = variants.find((variant) => variant.id === variantId);
-  const variantOptions = variants.map((variant) => ({
-    value: variant.id,
-    label: VARIANT_LABELS[variant.id],
-  }));
+  const activeVariant = mixedMode ? undefined : variants.find((variant) => variant.id === variantId);
+  const switchValue = mixedMode ? 'mixed' : variantId;
+  const variantOptions = [
+    ...variants.map((variant) => ({ value: variant.id as string, label: VARIANT_LABELS[variant.id] })),
+    { value: 'mixed', label: 'Микс' },
+  ];
+  const onSwitch = (value: string) =>
+    value === 'mixed' ? setMixedMode(true) : setVariant(value as VariantId);
   // The product switcher is hidden during a presentation so it can't derail the script.
   const showVariantSwitch = demoMode !== 'presentation';
 
@@ -118,8 +123,8 @@ export function Header() {
           <Segmented
             ariaLabel="Вариант продукта"
             options={variantOptions}
-            value={variantId}
-            onChange={setVariant}
+            value={switchValue}
+            onChange={onSwitch}
             compact={compact}
           />
         ) : null}

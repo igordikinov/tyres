@@ -103,6 +103,7 @@ export const STATE_COLORS: Record<string, string> = {
   blocked: '#FF9A3B',
   starved: '#0D56E2',
   bottleneck: '#EE4444',
+  changeover: '#EAB308',
 };
 
 export const CANVAS_INK = '#1F1F20';

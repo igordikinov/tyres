@@ -1,23 +1,16 @@
-import {
-  HISTORY_INTERVAL_MINUTES,
-  HISTORY_MAX_POINTS,
-  TICK_EPSILON,
-  TICK_MINUTES,
-  UTILIZATION_TAU_MINUTES,
-} from './constants';
-import { throughputPerHour } from './metrics';
+import { TICK_EPSILON, TICK_MINUTES, UTILIZATION_TAU_MINUTES } from './constants';
 import { Narrator } from './narrator';
 import {
-  countQueued,
-  countWip,
+  configureNode,
   createNodeRuntime,
+  recordHistory,
   type EngineState,
   type NodeRuntime,
   type Unit,
 } from './runtime';
-import { ReleasePlanCursor, routeFor } from './scheduling';
+import { changeoverFor, pickIndex, ReleasePlanCursor, routeFor } from './scheduling';
 import { buildSnapshot } from './snapshot';
-import type { Params, ScenarioDef, Snapshot } from './types';
+import type { Params, ScenarioDef, SchedulingPolicy, Snapshot } from './types';
 
 /**
  * Deterministic, fixed-step factory simulation.
@@ -37,6 +30,7 @@ export class FactoryEngine {
   private nextHistoryAt = 0;
   private readonly narrator: Narrator;
   private readonly releasePlan: ReleasePlanCursor;
+  private policy: SchedulingPolicy = 'fifo';
   /** Whole ticks executed so far; the clock is derived from this integer. */
   private ticks = 0;
   /** Total minutes requested, so partial frames accumulate without drift. */
@@ -61,7 +55,7 @@ export class FactoryEngine {
       time: 0,
       nodes: new Map<string, NodeRuntime>(),
       units: new Map<number, Unit>(),
-      completionTimes: [], leadTimes: [], completed: 0, released: 0,
+      completionTimes: [], leadTimes: [], completed: 0, completedByType: {}, released: 0,
       history: [], narration: '', narrationAt: 0,
     };
   }
@@ -87,21 +81,15 @@ export class FactoryEngine {
     return { ...this.params };
   }
 
+  /** Switches the queue-selection policy; seek() replays with the current one. */
+  setSchedulingPolicy(policy: SchedulingPolicy): void {
+    this.policy = policy;
+  }
+
   /** Applies tunables to the running model without discarding current state. */
   applyParams(params: Params): void {
     this.params = { ...params };
-    for (const node of this.state.nodes.values()) {
-      const { timeParam, capacityParam, queueParam } = node.def;
-      if (timeParam) node.processMinutes = Math.max(this.params[timeParam], TICK_MINUTES);
-      if (queueParam) node.queueCapacity = Math.round(this.params[queueParam]);
-      if (capacityParam) {
-        node.capacity = Math.max(1, Math.round(this.params[capacityParam]));
-        while (node.slots.length < node.capacity) node.slots.push(null);
-        while (node.slots.length > node.capacity && node.slots[node.slots.length - 1] === null) {
-          node.slots.pop();
-        }
-      }
-    }
+    for (const node of this.state.nodes.values()) configureNode(node, this.params);
   }
 
   /** Rebuilds the run from t = 0 up to `target`, used by the timeline. */
@@ -136,7 +124,7 @@ export class FactoryEngine {
       this.updateNode(this.state.nodes.get(this.order[i])!, dt);
     }
     this.release();
-    this.recordHistory();
+    this.nextHistoryAt = recordHistory(this.state, this.nextHistoryAt);
   }
 
   private updateMovers(dt: number): void {
@@ -150,6 +138,8 @@ export class FactoryEngine {
       if (target.def.kind === 'sink') {
         unit.phase = 'done';
         this.state.completed += 1;
+        const pid = unit.productId ?? 'all';
+        this.state.completedByType[pid] = (this.state.completedByType[pid] ?? 0) + 1;
         this.state.completionTimes.push(this.state.time);
         this.state.leadTimes.push(this.state.time - unit.createdAt);
         this.narrator.announce(target.def, this.state.time, this.state);
@@ -171,14 +161,19 @@ export class FactoryEngine {
 
     let working = 0;
     let blocked = 0;
+    let retooling = 0;
     for (let slot = 0; slot < node.slots.length; slot += 1) {
       const unitId = node.slots[slot];
       if (unitId === null) continue;
       const unit = this.state.units.get(unitId)!;
       const wasDone = unit.elapsed >= unit.duration;
       if (!wasDone) {
+        const before = unit.elapsed;
         unit.elapsed = Math.min(unit.duration, unit.elapsed + dt);
-        working += 1;
+        if (before < node.slotChangeover[slot]) {
+          retooling += 1;
+          node.changeoverAccrued += Math.min(unit.elapsed, node.slotChangeover[slot]) - before;
+        } else working += 1;
       }
       if (unit.elapsed >= unit.duration) {
         if (this.tryDepart(node, unitId)) {
@@ -189,23 +184,32 @@ export class FactoryEngine {
         }
       }
     }
+    const campaignSize = this.params.campaignSize;
     for (let slot = 0; slot < node.capacity && slot < node.slots.length; slot += 1) {
       if (node.slots[slot] !== null) continue;
-      const unitId = node.queue.shift();
-      if (unitId === undefined) break;
+      const idx = pickIndex(node, this.policy, campaignSize, (id) => this.state.units.get(id)!.productId);
+      if (idx < 0) break;
+      const unitId = node.queue.splice(idx, 1)[0];
       const unit = this.state.units.get(unitId)!;
+      const retool = changeoverFor(node, slot, unit.productId);
+      node.slotForm[slot] = unit.productId;
+      node.slotChangeover[slot] = retool;
       unit.phase = 'service';
       unit.slotIndex = slot;
       unit.elapsed = 0;
-      unit.duration = node.processMinutes;
+      unit.duration = retool + node.processMinutes;
       node.slots[slot] = unitId;
-      working += 1;
+      if (retool > 0) retooling += 1;
+      else working += 1;
     }
-    this.trackUtilization(node, working, dt);
+    // A retooling slot is busy (occupied, just not producing), so it counts
+    // toward utilisation — that is how a changeover-choked press becomes the
+    // constraint the TOC view highlights.
+    this.trackUtilization(node, working + retooling, dt);
     // idle = work incoming (queue/reserved); starved = upstream route ran dry.
     const awaiting = node.queue.length > 0 || node.reserved > 0;
     node.state =
-      blocked > 0 ? 'blocked' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
+      blocked > 0 ? 'blocked' : retooling > 0 ? 'changeover' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
   }
 
   private updateBuffer(node: NodeRuntime, dt: number): void {
@@ -281,19 +285,4 @@ export class FactoryEngine {
     to.reserved += 1;
   }
 
-  private recordHistory(): void {
-    while (this.state.time >= this.nextHistoryAt) {
-      this.state.history.push({
-        t: this.nextHistoryAt,
-        throughput: throughputPerHour(
-          this.state.completionTimes,
-          Math.max(this.state.time, TICK_MINUTES),
-        ),
-        wip: countWip(this.state.units),
-        queue: countQueued(this.state.nodes),
-      });
-      if (this.state.history.length > HISTORY_MAX_POINTS) this.state.history.shift();
-      this.nextHistoryAt += HISTORY_INTERVAL_MINUTES;
-    }
-  }
 }

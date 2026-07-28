@@ -7,6 +7,7 @@ import type {
   ParamKey,
   Params,
   ScenarioDef,
+  SchedulingPolicy,
   Snapshot,
   VariantDef,
   VariantId,
@@ -24,6 +25,15 @@ export interface SimulationControls {
   variants: VariantDef[];
   /** Switch product variant: deterministically recreates the engine. */
   setVariant: (id: VariantId) => void;
+  /** Mixed flow: all types on one line, routed and scheduled by type. */
+  mixedMode: boolean;
+  setMixedMode: (on: boolean) => void;
+  /** Active seasonal release-plan preset id (mixed flow). */
+  releasePlanId: string;
+  setReleasePlan: (id: string) => void;
+  /** Queue-selection policy (mixed flow). */
+  schedulingPolicy: SchedulingPolicy;
+  setSchedulingPolicy: (policy: SchedulingPolicy) => void;
   params: Params;
   playing: boolean;
   speed: SpeedOption;

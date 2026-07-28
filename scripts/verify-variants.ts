@@ -22,7 +22,7 @@ import { HORIZON_MINUTES } from '../src/core/constants';
 import { FactoryEngine } from '../src/core/engine';
 import { RELEASE_PLANS } from '../src/core/releasePlans';
 import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveMixed, resolveVariant } from '../src/core/scenario';
-import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
+import type { ParamDef, ReleaseOrder, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 
 const REAL = scenarioJson as unknown as ScenarioDef;
@@ -51,7 +51,7 @@ function makeBase(): ScenarioDef {
       { id: 'insp', index: 2, name: 'Insp', subtitle: '', kind: 'process', machine: 'inspection', processMinutes: 1, capacity: 1, queueCapacity: 2, transportMinutes: 0, next: 'sink', x: 10, y: 0, dir: 1 },
       { id: 'sink', index: 3, name: 'W', subtitle: '', kind: 'sink', machine: 'warehouse', processMinutes: 0, capacity: 0, queueCapacity: 0, transportMinutes: 0, next: null, x: 20, y: 0, dir: 1 },
     ],
-    params: { mixerTime: 3, extruderTime: 2.5, assemblyTime: 2, pressTime: 15, inspectionTime: 1.5, pressCount: 4, batchSize: 1, bufferCapacity: 40, studdingTime: 2, studdingCount: 1, restMinutes: 10 },
+    params: { mixerTime: 3, extruderTime: 2.5, assemblyTime: 2, pressTime: 15, inspectionTime: 1.5, pressCount: 4, batchSize: 1, bufferCapacity: 40, studdingTime: 2, studdingCount: 1, restMinutes: 10, changeoverMinutes: 60, campaignSize: 6 },
     paramDefs: [PARAM_DEF],
     optimisedParams: { pressCount: 8 },
     construction: [],
@@ -426,6 +426,105 @@ export function checkRouting(): string[] {
   const b = replay.getSnapshot().kpi;
   if (a.completed !== b.completed || a.wip !== b.wip) {
     failures.push(`mixed flow diverges live vs seek(): completed ${a.completed}/${b.completed}, wip ${a.wip}/${b.wip}`);
+  }
+  return failures;
+}
+
+/**
+ * Presses retool when the next unit needs a different mould (tyre-kkz.4): a
+ * mixed plan must drive the press into the 'changeover' state, while a
+ * single-type plan never does — no type switch, no changeover.
+ */
+export function checkChangeover(): string[] {
+  const failures: string[] = [];
+
+  const sawChangeover = (plan: ReleaseOrder[]): boolean => {
+    const scenario: ScenarioDef = { ...resolveMixed(REAL, plan) };
+    const engine = new FactoryEngine(scenario, baselineParams(scenario));
+    for (let t = 0; t < 300; t += 1) {
+      engine.advance(1);
+      if (engine.getSnapshot().nodes.press?.state === 'changeover') return true;
+    }
+    return false;
+  };
+
+  if (!sawChangeover(RELEASE_PLANS.offseason.plan)) {
+    failures.push('the press never retooled under a mixed plan — changeover not applied');
+  }
+  if (sawChangeover([{ variantId: 'summer', qty: 200 }])) {
+    failures.push('the press retooled under a single-type plan — changeover should not occur');
+  }
+  return failures;
+}
+
+/**
+ * The campaign policy batches same-type units, so it must incur fewer press
+ * changeovers than FIFO for the same mixed plan without losing output (spec
+ * §5.4.2 — the classic changeover/WIP trade-off).
+ */
+export function checkSchedulingPolicy(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+
+  const run = (policy: 'fifo' | 'campaigns') => {
+    const engine = new FactoryEngine(scenario, baselineParams(scenario));
+    engine.setSchedulingPolicy(policy);
+    engine.advance(HORIZON_MINUTES);
+    const snap = engine.getSnapshot();
+    return { changeover: snap.nodes.press?.changeoverMinutes ?? 0, completed: snap.kpi.completed };
+  };
+
+  const fifo = run('fifo');
+  const campaigns = run('campaigns');
+  if (!(campaigns.changeover < fifo.changeover)) {
+    failures.push(`campaigns should cut changeovers: FIFO ${fifo.changeover} vs campaigns ${campaigns.changeover} min`);
+  }
+  if (campaigns.completed < fifo.completed) {
+    failures.push(`campaigns should not lose output: FIFO ${fifo.completed} vs campaigns ${campaigns.completed}`);
+  }
+  return failures;
+}
+
+/** The mixed flow reports output per product type; the parts sum to the whole (tyre-kkz.6). */
+export function checkKpiByType(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  engine.advance(HORIZON_MINUTES);
+  const kpi = engine.getSnapshot().kpi;
+  if (!kpi.byType) {
+    failures.push('the mixed flow should expose kpi.byType');
+    return failures;
+  }
+  const sum = kpi.byType.reduce((total, type) => total + type.completed, 0);
+  if (sum !== kpi.completed) {
+    failures.push(`per-type completions ${sum} must sum to the total ${kpi.completed}`);
+  }
+  const types = kpi.byType.map((type) => type.productId);
+  for (const id of ['summer', 'winter', 'winter-studded'] as VariantId[]) {
+    if (!types.includes(id)) failures.push(`kpi.byType is missing "${id}"`);
+  }
+  return failures;
+}
+
+/**
+ * With changeovers eroding effective press capacity, TOC must still identify a
+ * constraint in the mixed flow, and the press must actually accrue changeover
+ * time (spec §5.4.4 — the constraint accounting includes retooling).
+ */
+export function checkMixedConstraint(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  engine.advance(300);
+  const snap = engine.getSnapshot();
+  const press = snap.nodes.press;
+  if (!(press && (press.changeoverMinutes ?? 0) > 0)) {
+    failures.push('the mixed press should accrue changeover time');
+  }
+  // With changeovers eroding the press, TOC must flag it — not an upstream node.
+  if (snap.kpi.bottleneckId !== 'press') {
+    failures.push(`mixed constraint should be the press once changeovers bite, got "${String(snap.kpi.bottleneckId)}"`);
   }
   return failures;
 }

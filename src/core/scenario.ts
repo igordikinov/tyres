@@ -1,6 +1,6 @@
 import rawTireFactory from '@/scenarios/tire-factory.json';
 import { SHIFT_START_HOUR } from './constants';
-import type { NodeDef, Params, ReleaseOrder, ScenarioDef, VariantDef, VariantId } from './types';
+import type { NodeDef, ParamDef, Params, ReleaseOrder, ScenarioDef, VariantDef, VariantId } from './types';
 
 /**
  * Scenarios are plain data. Adding a new industry means adding a JSON file,
@@ -81,12 +81,20 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
  */
 export function resolveMixed(scenario: ScenarioDef, releasePlan: ReleaseOrder[]): ScenarioDef {
   const studded = resolveVariant(scenario, 'winter-studded');
-  const nodes = studded.nodes.map((node) =>
-    node.id === 'inspection'
-      ? { ...node, next: 'warehouse', routes: { 'winter-studded': 'studding' } as NodeDef['routes'] }
-      : node,
-  );
-  return { ...studded, nodes, productId: undefined, releasePlan, product: 'Смешанный поток' };
+  const nodes = studded.nodes.map((node) => {
+    if (node.id === 'inspection') {
+      return { ...node, next: 'warehouse', routes: { 'winter-studded': 'studding' } as NodeDef['routes'] };
+    }
+    // The vulcanisation press carries a mould that must be changed per product.
+    if (node.id === 'press') return { ...node, changeoverParam: 'changeoverMinutes' as NodeDef['changeoverParam'] };
+    return node;
+  });
+  const paramDefs: ParamDef[] = [
+    ...studded.paramDefs,
+    { key: 'changeoverMinutes', label: 'Переналадка формы', unit: 'мин', min: 15, max: 120, step: 5, group: 'mixed', hint: 'Время смены пресс-формы при переходе на другой тип шины' },
+    { key: 'campaignSize', label: 'Размер кампании', unit: 'шт', min: 2, max: 12, step: 1, group: 'mixed', hint: 'Сколько шин одного типа идёт подряд в режиме «Кампании»' },
+  ];
+  return { ...studded, nodes, paramDefs, productId: undefined, releasePlan, product: 'Смешанный поток' };
 }
 
 export function baselineParams(scenario: ScenarioDef): Params {

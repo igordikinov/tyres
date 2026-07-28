@@ -2,10 +2,18 @@ import { ArrowUturnLeftIcon, BoltIcon } from '@/components/ui/icons';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { Panel, SectionLabel } from '@/components/ui/Panel';
 import { RangeControl } from '@/components/ui/RangeControl';
+import { Segmented } from '@/components/ui/Segmented';
 import { ToggleSwitch } from '@/components/ui/ToggleSwitch';
+import { RELEASE_PLANS } from '@/core/releasePlans';
 import { formatNumber } from '@/core/scenario';
 import type { ParamDef } from '@/core/types';
 import { useSimulationControls, useSimulationKpi } from '@/state/SimulationContext';
+
+const PLAN_OPTIONS = Object.values(RELEASE_PLANS).map((preset) => ({ value: preset.id, label: preset.name }));
+const POLICY_OPTIONS = [
+  { value: 'fifo' as const, label: 'FIFO' },
+  { value: 'campaigns' as const, label: 'Кампании' },
+];
 
 function ParameterRow({
   def,
@@ -51,8 +59,22 @@ function ParameterRow({
 }
 
 export function ParameterPanel() {
-  const { scenario, params, setParam, restoreBaseline, applyOptimised, tocMode, setTocMode, apsMode, setApsMode } =
-    useSimulationControls();
+  const {
+    scenario,
+    params,
+    setParam,
+    restoreBaseline,
+    applyOptimised,
+    tocMode,
+    setTocMode,
+    apsMode,
+    setApsMode,
+    mixedMode,
+    releasePlanId,
+    setReleasePlan,
+    schedulingPolicy,
+    setSchedulingPolicy,
+  } = useSimulationControls();
   const { kpi } = useSimulationKpi();
 
   const constraintNode = kpi.bottleneckId ? scenario.nodes.find((node) => node.id === kpi.bottleneckId) : undefined;
@@ -64,6 +86,7 @@ export function ParameterPanel() {
     { key: 'time', label: 'Время операций' },
     { key: 'capacity', label: 'Мощность и партии' },
     { key: 'studding', label: 'Ошиповка' },
+    { key: 'mixed', label: 'Планирование' },
   ];
 
   return (
@@ -80,6 +103,26 @@ export function ParameterPanel() {
       }
     >
       <div className="scroll-thin min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+        {mixedMode ? (
+          <div className="mb-1">
+            <SectionLabel>План выпуска</SectionLabel>
+            <Segmented ariaLabel="План выпуска" options={PLAN_OPTIONS} value={releasePlanId} onChange={setReleasePlan} />
+            <p className="mt-1 text-[10px] text-ink-400">
+              Микс лето / зима / шип: {RELEASE_PLANS[releasePlanId]?.mix}
+            </p>
+            <SectionLabel>Политика планирования</SectionLabel>
+            <Segmented
+              ariaLabel="Политика планирования"
+              options={POLICY_OPTIONS}
+              value={schedulingPolicy}
+              onChange={setSchedulingPolicy}
+            />
+            <p className="mt-1 text-[10px] leading-snug text-ink-400">
+              FIFO — заказы как пришли (много переналадок); Кампании — группировка по типу (меньше переналадок, больше НЗП).
+            </p>
+          </div>
+        ) : null}
+
         {groups.map((group) => {
           const defs = scenario.paramDefs.filter((def) => def.group === group.key);
           // A variant that doesn't use a group (e.g. summer has no studding) hides it.

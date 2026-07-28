@@ -17,9 +17,11 @@ import {
   listVariants,
   nodeDefsById,
   optimisedParams,
+  resolveMixed,
   resolveVariant,
 } from '@/core/scenario';
-import type { ParamKey, Params, Snapshot, VariantDef, VariantId } from '@/core/types';
+import { DEFAULT_RELEASE_PLAN_ID, RELEASE_PLANS } from '@/core/releasePlans';
+import type { ParamKey, Params, SchedulingPolicy, ScenarioDef, Snapshot, VariantDef, VariantId } from '@/core/types';
 import { useAnimationFrame } from '@/hooks/useAnimationFrame';
 import {
   ControlsContext,
@@ -49,7 +51,16 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
   );
 
   const [variantId, setVariantId] = useState<VariantId>(DEFAULT_VARIANT_ID);
-  const scenario = useMemo(() => resolveVariant(baseScenario, variantId), [baseScenario, variantId]);
+  const [mixedMode, setMixedFlag] = useState(false);
+  const [releasePlanId, setReleasePlanId] = useState<string>(DEFAULT_RELEASE_PLAN_ID);
+  const [schedulingPolicy, setPolicyState] = useState<SchedulingPolicy>('fifo');
+  const scenario = useMemo(
+    () =>
+      mixedMode
+        ? resolveMixed(baseScenario, RELEASE_PLANS[releasePlanId].plan)
+        : resolveVariant(baseScenario, variantId),
+    [baseScenario, mixedMode, releasePlanId, variantId],
+  );
   const defs = useMemo(() => nodeDefsById(scenario), [scenario]);
   const engineRef = useRef<FactoryEngine | null>(null);
   if (engineRef.current === null) {
@@ -183,19 +194,17 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
     [commitParams, scenario],
   );
 
-  // Switching variant is a hard, deterministic reset: build a fresh engine for
-  // the resolved scenario at its baseline, then republish from clock zero. This
-  // mirrors seek(0) so a live run of the new variant stays reproducible.
-  const setVariant = useCallback(
-    (id: VariantId) => {
-      if (id === variantId) return;
-      const nextScenario = resolveVariant(baseScenario, id);
+  // A hard, deterministic reset: build a fresh engine for the given scenario at
+  // its baseline, apply the current policy, and republish from clock zero — the
+  // same effect as seek(0), so the live run stays reproducible.
+  const installScenario = useCallback(
+    (nextScenario: ScenarioDef) => {
       const nextParams = baselineParams(nextScenario);
       const nextEngine = new FactoryEngine(nextScenario, nextParams);
+      nextEngine.setSchedulingPolicy(schedulingPolicy);
       engineRef.current = nextEngine;
       playingRef.current = false;
       setPlaying(false);
-      setVariantId(id);
       setParams(nextParams);
       const shot = nextEngine.getSnapshot();
       setSnapshot(shot);
@@ -203,7 +212,43 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       lastKpiRef.current = 0;
       markDirty();
     },
-    [variantId, baseScenario, markDirty],
+    [schedulingPolicy, markDirty],
+  );
+
+  const setVariant = useCallback(
+    (id: VariantId) => {
+      setMixedFlag(false);
+      setVariantId(id);
+      installScenario(resolveVariant(baseScenario, id));
+    },
+    [baseScenario, installScenario],
+  );
+
+  const setMixedMode = useCallback(
+    (on: boolean) => {
+      setMixedFlag(on);
+      installScenario(
+        on ? resolveMixed(baseScenario, RELEASE_PLANS[releasePlanId].plan) : resolveVariant(baseScenario, variantId),
+      );
+    },
+    [baseScenario, releasePlanId, variantId, installScenario],
+  );
+
+  const setReleasePlan = useCallback(
+    (id: string) => {
+      setReleasePlanId(id);
+      if (mixedMode) installScenario(resolveMixed(baseScenario, RELEASE_PLANS[id].plan));
+    },
+    [baseScenario, mixedMode, installScenario],
+  );
+
+  const setSchedulingPolicy = useCallback(
+    (policy: SchedulingPolicy) => {
+      setPolicyState(policy);
+      engineRef.current?.setSchedulingPolicy(policy);
+      markDirty();
+    },
+    [markDirty],
   );
 
   const controls = useMemo<SimulationControls>(
@@ -213,6 +258,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       variantId,
       variants,
       setVariant,
+      mixedMode,
+      setMixedMode,
+      releasePlanId,
+      setReleasePlan,
+      schedulingPolicy,
+      setSchedulingPolicy,
       params,
       playing,
       speed,
@@ -239,6 +290,12 @@ export function SimulationProvider({ children }: { children: ReactNode }) {
       variantId,
       variants,
       setVariant,
+      mixedMode,
+      setMixedMode,
+      releasePlanId,
+      setReleasePlan,
+      schedulingPolicy,
+      setSchedulingPolicy,
       params,
       playing,
       speed,
