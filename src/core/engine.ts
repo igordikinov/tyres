@@ -15,6 +15,7 @@ import {
   type NodeRuntime,
   type Unit,
 } from './runtime';
+import { ReleasePlanCursor, routeFor } from './scheduling';
 import { buildSnapshot } from './snapshot';
 import type { Params, ScenarioDef, Snapshot } from './types';
 
@@ -35,6 +36,7 @@ export class FactoryEngine {
   private nextReleaseAt = 0;
   private nextHistoryAt = 0;
   private readonly narrator: Narrator;
+  private readonly releasePlan: ReleasePlanCursor;
   /** Whole ticks executed so far; the clock is derived from this integer. */
   private ticks = 0;
   /** Total minutes requested, so partial frames accumulate without drift. */
@@ -44,6 +46,7 @@ export class FactoryEngine {
     this.scenario = scenario;
     this.params = { ...params };
     this.narrator = new Narrator(scenario);
+    this.releasePlan = new ReleasePlanCursor(scenario.releasePlan, scenario.productId ?? null);
     this.state = this.createState();
     this.reset();
   }
@@ -58,13 +61,8 @@ export class FactoryEngine {
       time: 0,
       nodes: new Map<string, NodeRuntime>(),
       units: new Map<number, Unit>(),
-      completionTimes: [],
-      leadTimes: [],
-      completed: 0,
-      released: 0,
-      history: [],
-      narration: '',
-      narrationAt: 0,
+      completionTimes: [], leadTimes: [], completed: 0, released: 0,
+      history: [], narration: '', narrationAt: 0,
     };
   }
 
@@ -79,6 +77,7 @@ export class FactoryEngine {
     this.nextReleaseAt = 0;
     this.nextHistoryAt = 0;
     this.narrator.reset();
+    this.releasePlan.reset();
     this.ticks = 0;
     this.requestedMinutes = 0;
     this.applyParams(this.params);
@@ -112,9 +111,8 @@ export class FactoryEngine {
   }
 
   /**
-   * Advances the clock in whole ticks only. The fractional remainder of a
-   * browser frame is carried over, which keeps a live run bit-identical to a
-   * replay produced by `seek()`.
+   * Advances in whole ticks only; a browser frame's fractional remainder carries
+   * over so a live run stays bit-identical to a seek() replay.
    */
   advance(minutes: number): void {
     if (!(minutes > 0)) return;
@@ -204,8 +202,7 @@ export class FactoryEngine {
       working += 1;
     }
     this.trackUtilization(node, working, dt);
-    // Idle: nothing to do right now but material is already on its way.
-    // Starved: the upstream route has run dry.
+    // idle = work incoming (queue/reserved); starved = upstream route ran dry.
     const awaiting = node.queue.length > 0 || node.reserved > 0;
     node.state =
       blocked > 0 ? 'blocked' : working > 0 ? 'working' : awaiting ? 'idle' : 'starved';
@@ -249,6 +246,7 @@ export class FactoryEngine {
         elapsed: 0,
         duration: Math.max(source.def.transportMinutes, TICK_MINUTES),
         slotIndex: 0,
+        productId: this.releasePlan.next(),
       };
       this.state.units.set(unit.id, unit);
       target.reserved += 1;
@@ -265,7 +263,8 @@ export class FactoryEngine {
   }
 
   private tryDepart(node: NodeRuntime, unitId: number): boolean {
-    const next = node.def.next ? this.state.nodes.get(node.def.next)! : null;
+    const nextId = routeFor(node.def, this.state.units.get(unitId)!.productId);
+    const next = nextId ? this.state.nodes.get(nextId)! : null;
     if (!next || !this.hasRoom(next)) return false;
     this.startMove(node, next, unitId);
     this.narrator.announce(node.def, this.state.time, this.state);

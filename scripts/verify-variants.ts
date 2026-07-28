@@ -20,7 +20,8 @@ import {
 } from '../src/core/constants';
 import { HORIZON_MINUTES } from '../src/core/constants';
 import { FactoryEngine } from '../src/core/engine';
-import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveVariant } from '../src/core/scenario';
+import { RELEASE_PLANS } from '../src/core/releasePlans';
+import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveMixed, resolveVariant } from '../src/core/scenario';
 import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 
@@ -317,6 +318,115 @@ export function checkBottleneckMigration(): string[] {
     failures.push(`studded lead time (${def.kpi.cycleTimeMinutes.toFixed(0)}) must exceed summer (${summerCycle.toFixed(0)})`);
   }
 
+  return failures;
+}
+
+/**
+ * Every unit carries the product type it belongs to (tyre-kkz.1). With a single
+ * resolved variant, every in-flight unit reports that variant's id — the basis
+ * for per-type colouring, routing and changeovers in the mixed flow.
+ */
+export function checkUnitProductId(): string[] {
+  const failures: string[] = [];
+  for (const id of ['summer', 'winter-studded'] as VariantId[]) {
+    const sc = resolveVariant(REAL, id);
+    if (sc.productId !== id) failures.push(`resolveVariant must tag scenario.productId="${id}", got "${String(sc.productId)}"`);
+    const engine = new FactoryEngine(sc, baselineParams(sc));
+    engine.advance(90);
+    const units = engine.getSnapshot().units;
+    if (units.length === 0) {
+      failures.push(`variant "${id}" had no in-flight units to check productId`);
+      continue;
+    }
+    const mismatched = units.filter((unit) => unit.productId !== id).length;
+    if (mismatched > 0) failures.push(`variant "${id}": ${mismatched}/${units.length} units have the wrong productId`);
+  }
+  return failures;
+}
+
+/**
+ * A releasePlan drives a deterministic, RNG-free product mix (tyre-kkz.2): the
+ * n-th released unit's type follows the cyclic plan pattern, and two runs of the
+ * same plan release the same sequence.
+ */
+export function checkReleasePlan(): string[] {
+  const failures: string[] = [];
+  const plan = RELEASE_PLANS.offseason.plan; // summer×5, winter×3, studded×2
+  const pattern = plan.flatMap((order) => Array<VariantId>(order.qty).fill(order.variantId));
+  const scenario: ScenarioDef = { ...resolveVariant(REAL, 'winter-studded'), releasePlan: plan };
+
+  const run = (): Map<number, VariantId | undefined> => {
+    const engine = new FactoryEngine(scenario, baselineParams(scenario));
+    const seen = new Map<number, VariantId | undefined>();
+    for (let t = 0; t < 120; t += 1) {
+      engine.advance(1);
+      for (const unit of engine.getSnapshot().units) if (!seen.has(unit.id)) seen.set(unit.id, unit.productId);
+    }
+    return seen;
+  };
+
+  const seen = run();
+  if (seen.size < 12) failures.push(`releasePlan should release many units, saw ${seen.size}`);
+  let offPattern = 0;
+  for (const [id, productId] of seen) {
+    const expected = pattern[(id - 1) % pattern.length];
+    if (productId !== expected) offPattern += 1;
+  }
+  if (offPattern > 0) failures.push(`releasePlan: ${offPattern}/${seen.size} units do not follow the plan pattern`);
+
+  const seen2 = run();
+  if (seen2.size !== seen.size || [...seen].some(([id, pid]) => seen2.get(id) !== pid)) {
+    failures.push('releasePlan is not deterministic across runs');
+  }
+  return failures;
+}
+
+/**
+ * In the mixed flow, «Контроль» routes by product type (tyre-kkz.3): only
+ * studded units enter the studding branch; summer and winter go straight to the
+ * warehouse. Studded units must still reach the branch, and no other type may.
+ */
+export function checkRouting(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  const branch = new Set(['studding', 'studCheck', 'restRack']);
+  const studdedInBranch = new Set<number>();
+  const trespassers = new Set<VariantId>();
+
+  for (let t = 0; t < 300; t += 1) {
+    engine.advance(1);
+    for (const unit of engine.getSnapshot().units) {
+      if (!branch.has(unit.nodeId)) continue;
+      if (unit.productId === 'winter-studded') studdedInBranch.add(unit.id);
+      else if (unit.productId) trespassers.add(unit.productId);
+    }
+  }
+
+  if (trespassers.size > 0) {
+    failures.push(`non-studded types entered the studding branch: ${[...trespassers].join(', ')}`);
+  }
+  if (studdedInBranch.size === 0) {
+    failures.push('studded units never reached the studding branch — routing not applied');
+  }
+
+  // Mixed flow stays deterministic: a jittery live run equals a seek() replay.
+  const live = new FactoryEngine(scenario, baselineParams(scenario));
+  let elapsed = 0;
+  let seed = 11;
+  while (elapsed < HORIZON_MINUTES) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const frame = Math.min(0.02 + (seed / 2147483648) * 0.12, HORIZON_MINUTES - elapsed);
+    live.advance(frame);
+    elapsed += frame;
+  }
+  const replay = new FactoryEngine(scenario, baselineParams(scenario));
+  replay.seek(HORIZON_MINUTES);
+  const a = live.getSnapshot().kpi;
+  const b = replay.getSnapshot().kpi;
+  if (a.completed !== b.completed || a.wip !== b.wip) {
+    failures.push(`mixed flow diverges live vs seek(): completed ${a.completed}/${b.completed}, wip ${a.wip}/${b.wip}`);
+  }
   return failures;
 }
 

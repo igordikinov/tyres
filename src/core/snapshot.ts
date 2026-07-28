@@ -91,6 +91,7 @@ export function buildSnapshot(state: EngineState): Snapshot {
       slotIndex: unit.slotIndex,
       createdAt: unit.createdAt,
       appearanceStage: stageAt(unit.nodeId),
+      productId: unit.productId ?? undefined,
     });
   }
 

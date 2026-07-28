@@ -1,6 +1,6 @@
 import rawTireFactory from '@/scenarios/tire-factory.json';
 import { SHIFT_START_HOUR } from './constants';
-import type { NodeDef, Params, ScenarioDef, VariantDef, VariantId } from './types';
+import type { NodeDef, Params, ReleaseOrder, ScenarioDef, VariantDef, VariantId } from './types';
 
 /**
  * Scenarios are plain data. Adding a new industry means adding a JSON file,
@@ -39,6 +39,7 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
     nodes: scenario.nodes.map((node) => ({ ...node })),
   };
 
+  base.productId = variantId;
   const variant = variants?.find((candidate) => candidate.id === variantId);
   if (!variant) return base;
 
@@ -70,6 +71,22 @@ export function resolveVariant(scenario: ScenarioDef, variantId: VariantId): Sce
         ? [...(base.presentation ?? []), ...(variant.presentation ?? [])]
         : undefined,
   };
+}
+
+/**
+ * Builds the mixed-flow scenario (Phase 2): the studded superset line carries
+ * all product types, but «Контроль» routes only studded units into the studding
+ * branch — summer and winter go straight to the warehouse. The release plan
+ * feeds the seasonal mix; there is no single productId.
+ */
+export function resolveMixed(scenario: ScenarioDef, releasePlan: ReleaseOrder[]): ScenarioDef {
+  const studded = resolveVariant(scenario, 'winter-studded');
+  const nodes = studded.nodes.map((node) =>
+    node.id === 'inspection'
+      ? { ...node, next: 'warehouse', routes: { 'winter-studded': 'studding' } as NodeDef['routes'] }
+      : node,
+  );
+  return { ...studded, nodes, productId: undefined, releasePlan, product: 'Смешанный поток' };
 }
 
 export function baselineParams(scenario: ScenarioDef): Params {
