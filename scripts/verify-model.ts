@@ -14,6 +14,7 @@ import {
   checkAppearanceStage,
   checkBottleneckMigration,
   checkReleasePlan,
+  checkRouting,
   checkScenarioVariants,
   checkUnitProductId,
   checkVariantConstants,
@@ -143,6 +144,7 @@ failures.push(...checkAppearanceStage());
 failures.push(...checkBottleneckMigration());
 failures.push(...checkUnitProductId());
 failures.push(...checkReleasePlan());
+failures.push(...checkRouting());
 
 if (failures.length > 0) {
   console.error('\nMODEL CHECK FAILED');

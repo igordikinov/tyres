@@ -1,4 +1,10 @@
-import type { ReleaseOrder, VariantId } from './types';
+import type { NodeDef, ReleaseOrder, VariantId } from './types';
+
+/** Next node id for a unit leaving `def`, honouring per-product route overrides. */
+export function routeFor(def: NodeDef, productId: VariantId | null): string | null {
+  const routed = def.routes && productId ? def.routes[productId] : undefined;
+  return routed !== undefined ? routed : def.next;
+}
 
 /**
  * Walks a cyclic release plan one product at a time. Pure, resettable state, so

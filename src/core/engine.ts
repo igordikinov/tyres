@@ -15,7 +15,7 @@ import {
   type NodeRuntime,
   type Unit,
 } from './runtime';
-import { ReleasePlanCursor } from './scheduling';
+import { ReleasePlanCursor, routeFor } from './scheduling';
 import { buildSnapshot } from './snapshot';
 import type { Params, ScenarioDef, Snapshot } from './types';
 
@@ -263,7 +263,8 @@ export class FactoryEngine {
   }
 
   private tryDepart(node: NodeRuntime, unitId: number): boolean {
-    const next = node.def.next ? this.state.nodes.get(node.def.next)! : null;
+    const nextId = routeFor(node.def, this.state.units.get(unitId)!.productId);
+    const next = nextId ? this.state.nodes.get(nextId)! : null;
     if (!next || !this.hasRoom(next)) return false;
     this.startMove(node, next, unitId);
     this.narrator.announce(node.def, this.state.time, this.state);

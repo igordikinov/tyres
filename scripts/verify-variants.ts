@@ -21,7 +21,7 @@ import {
 import { HORIZON_MINUTES } from '../src/core/constants';
 import { FactoryEngine } from '../src/core/engine';
 import { RELEASE_PLANS } from '../src/core/releasePlans';
-import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveVariant } from '../src/core/scenario';
+import { baselineParams, DEFAULT_VARIANT_ID, listVariants, resolveMixed, resolveVariant } from '../src/core/scenario';
 import type { ParamDef, ScenarioDef, VariantId } from '../src/core/types';
 import scenarioJson from '../src/scenarios/tire-factory.json';
 
@@ -377,6 +377,55 @@ export function checkReleasePlan(): string[] {
   const seen2 = run();
   if (seen2.size !== seen.size || [...seen].some(([id, pid]) => seen2.get(id) !== pid)) {
     failures.push('releasePlan is not deterministic across runs');
+  }
+  return failures;
+}
+
+/**
+ * In the mixed flow, «Контроль» routes by product type (tyre-kkz.3): only
+ * studded units enter the studding branch; summer and winter go straight to the
+ * warehouse. Studded units must still reach the branch, and no other type may.
+ */
+export function checkRouting(): string[] {
+  const failures: string[] = [];
+  const scenario = resolveMixed(REAL, RELEASE_PLANS.offseason.plan);
+  const engine = new FactoryEngine(scenario, baselineParams(scenario));
+  const branch = new Set(['studding', 'studCheck', 'restRack']);
+  const studdedInBranch = new Set<number>();
+  const trespassers = new Set<VariantId>();
+
+  for (let t = 0; t < 300; t += 1) {
+    engine.advance(1);
+    for (const unit of engine.getSnapshot().units) {
+      if (!branch.has(unit.nodeId)) continue;
+      if (unit.productId === 'winter-studded') studdedInBranch.add(unit.id);
+      else if (unit.productId) trespassers.add(unit.productId);
+    }
+  }
+
+  if (trespassers.size > 0) {
+    failures.push(`non-studded types entered the studding branch: ${[...trespassers].join(', ')}`);
+  }
+  if (studdedInBranch.size === 0) {
+    failures.push('studded units never reached the studding branch — routing not applied');
+  }
+
+  // Mixed flow stays deterministic: a jittery live run equals a seek() replay.
+  const live = new FactoryEngine(scenario, baselineParams(scenario));
+  let elapsed = 0;
+  let seed = 11;
+  while (elapsed < HORIZON_MINUTES) {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    const frame = Math.min(0.02 + (seed / 2147483648) * 0.12, HORIZON_MINUTES - elapsed);
+    live.advance(frame);
+    elapsed += frame;
+  }
+  const replay = new FactoryEngine(scenario, baselineParams(scenario));
+  replay.seek(HORIZON_MINUTES);
+  const a = live.getSnapshot().kpi;
+  const b = replay.getSnapshot().kpi;
+  if (a.completed !== b.completed || a.wip !== b.wip) {
+    failures.push(`mixed flow diverges live vs seek(): completed ${a.completed}/${b.completed}, wip ${a.wip}/${b.wip}`);
   }
   return failures;
 }

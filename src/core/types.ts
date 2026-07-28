@@ -70,6 +70,8 @@ export interface NodeDef {
   /** Travel time towards `next`, in simulated minutes. */
   transportMinutes: number;
   next: string | null;
+  /** Per-product-type route overrides (mixed flow); falls back to `next`. */
+  routes?: Partial<Record<VariantId, string | null>>;
   /** Canvas coordinates in scenario viewBox units. */
   x: number;
   y: number;
