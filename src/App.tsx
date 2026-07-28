@@ -71,7 +71,15 @@ function Workspace() {
   const reference = REFERENCE_MODES.has(demoMode);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-muted">
+    <div
+      className="flex h-full w-full flex-col overflow-hidden bg-surface-muted"
+      style={{
+        paddingTop: 'env(safe-area-inset-top)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+        paddingLeft: 'env(safe-area-inset-left)',
+        paddingRight: 'env(safe-area-inset-right)',
+      }}
+    >
       <Header />
 
       <main className="flex min-h-0 flex-1 gap-3 p-3">

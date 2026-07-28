@@ -13,10 +13,21 @@
     height: 100%;
   }
 
+  /* Dynamic viewport on mobile so the iOS address bar can't clip the timeline. */
+  #root {
+    height: 100dvh;
+  }
+
   body {
     @apply bg-surface text-ink-900 font-sans antialiased;
     margin: 0;
     overflow: hidden;
+    /* Kill iOS rubber-band / pull-to-refresh; canvas gestures own their zone. */
+    overscroll-behavior: none;
+  }
+
+  html {
+    overscroll-behavior: none;
   }
 
   /* Every control in this application is a custom component. */
