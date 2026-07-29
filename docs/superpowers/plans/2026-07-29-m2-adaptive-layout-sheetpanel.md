@@ -309,7 +309,7 @@ function DesktopWorkspace({ reference }: { reference: boolean }) {
 
 - [ ] **Step 2: Have `Workspace` select the desktop body via the tier**
 
-Update `Workspace` to call the hook and render `DesktopWorkspace` for now (mobile branch added in Task 4). The outer `div` (safe-area padding), `<Header />`, and `<TimelineBar />` stay exactly as they are:
+Update `Workspace` to call the hook and branch on the tier. The mobile branch renders `null` as a temporary placeholder (Task 4 replaces it with `<MobileWorkspace/>`). Branching now — rather than rendering `DesktopWorkspace` unconditionally — keeps `tier` used so `noUnusedLocals` does not fail the typecheck gate. Since the jsdom smoke runs at width 1024 (`desktop` tier), the desktop layout still renders and the existing assertions stay green. The outer `div` (safe-area padding), `<Header />`, and `<TimelineBar />` stay exactly as they are:
 
 ```tsx
 function Workspace() {
@@ -328,7 +328,7 @@ function Workspace() {
       }}
     >
       <Header />
-      <DesktopWorkspace reference={reference} />
+      {tier === 'desktop' ? <DesktopWorkspace reference={reference} /> : null}
       <TimelineBar />
     </div>
   );
@@ -344,7 +344,7 @@ import { useBreakpoint } from '@/hooks/useBreakpoint';
 - [ ] **Step 3: Run typecheck**
 
 Run: `npm run typecheck`
-Expected: PASS. (`tier` is currently read but only used in Task 4; to avoid a `noUnusedLocals`-style complaint, it is fine because `const tier` is used as a value in Task 4 — if the executor stops here, temporarily reference it. Task 4 immediately consumes it, so implement Tasks 3 and 4 back-to-back.)
+Expected: PASS. `tier` is consumed by the `tier === 'desktop'` branch, so `noUnusedLocals` is satisfied.
 
 - [ ] **Step 4: Run the full check — desktop must be pixel-identical**
 
@@ -481,7 +481,7 @@ function MobileWorkspace({ reference }: { reference: boolean }) {
 
 - [ ] **Step 4: Render `MobileWorkspace` for non-desktop tiers**
 
-In `Workspace`, replace the single `<DesktopWorkspace .../>` line with a tier branch:
+In `Workspace`, replace the `null` mobile placeholder (added in Task 3) with `<MobileWorkspace/>`:
 
 ```tsx
       <Header />
