@@ -81,6 +81,14 @@ export const TIMELINE_MARKER_COUNT = 8;
 /** Playback speed used by the unattended presentation. */
 export const PRESENTATION_SPEED = 4;
 
+/**
+ * Layout breakpoints for the Фаза 3 responsive shell (§6.2).
+ * Thresholds live here so no width literal appears in markup.
+ * < sm → phone (single column + sheets); sm..<lg → tablet (single column + sheets);
+ * >= lg → the unchanged three-column desktop layout.
+ */
+export const BREAKPOINTS = { sm: 640, lg: 1024 } as const;
+
 /** Dwell time of one step of the layer-by-layer build, in real milliseconds. */
 export const ASSEMBLY_STEP_MS = 1400;
 
