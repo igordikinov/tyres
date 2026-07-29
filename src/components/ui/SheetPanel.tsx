@@ -19,30 +19,50 @@ export interface SheetPanelProps {
 export function SheetPanel({ open, title, onClose, children }: SheetPanelProps) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<Element | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
+    const sheet = sheetRef.current;
     returnFocusRef.current = document.activeElement;
-    sheetRef.current?.focus();
+
+    const focusables = (): HTMLElement[] =>
+      sheet
+        ? Array.from(
+            sheet.querySelectorAll<HTMLElement>(
+              '[tabindex]:not([tabindex="-1"]), [role="slider"]:not([tabindex="-1"])',
+            ),
+          )
+        : [];
+
+    // Start on the first real control; fall back to the (programmatically
+    // focusable) container when the sheet has no focusable descendants.
+    (focusables()[0] ?? sheet)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
-      if (event.key !== 'Tab' || !sheetRef.current) return;
-      const focusable = sheetRef.current.querySelectorAll<HTMLElement>(
-        '[tabindex]:not([tabindex="-1"]), [role="slider"]',
-      );
-      if (focusable.length === 0) {
+      if (event.key !== 'Tab' || !sheet) return;
+      const items = focusables();
+      if (items.length === 0) {
         event.preventDefault();
-        sheetRef.current.focus();
+        sheet.focus();
         return;
       }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
+      const first = items[0];
+      const last = items[items.length - 1];
       const active = document.activeElement;
+      // Container itself (tabIndex -1) or focus that has left the sheet:
+      // pull it back to an edge so Tab/Shift+Tab can never escape the modal.
+      if (active === sheet || !sheet.contains(active)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+        return;
+      }
       if (event.shiftKey && active === first) {
         event.preventDefault();
         last.focus();
@@ -58,7 +78,7 @@ export function SheetPanel({ open, title, onClose, children }: SheetPanelProps) 
       const target = returnFocusRef.current;
       if (target instanceof HTMLElement && document.contains(target)) target.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const onDragEnd = (_event: unknown, info: PanInfo) => {
     if (info.offset.y > 120 || info.velocity.y > 500) onClose();
@@ -71,6 +91,7 @@ export function SheetPanel({ open, title, onClose, children }: SheetPanelProps) 
           <Pressable
             label="Закрыть панель"
             onPress={onClose}
+            tabIndex={-1}
             className="absolute inset-0 h-full w-full bg-ink-900/40"
           >
             <span className="sr-only">Закрыть панель</span>
