@@ -11,6 +11,7 @@ import { ChapterRail } from '@/components/modes/ChapterRail';
 import { CompareView } from '@/components/modes/CompareView';
 import { NarrationBanner } from '@/components/modes/NarrationBanner';
 import { usePresentationDirector } from '@/components/modes/usePresentationDirector';
+import { useBreakpoint } from '@/hooks/useBreakpoint';
 import {
   SimulationProvider,
   useSimulationControls,
@@ -66,9 +67,35 @@ function CanvasStage() {
   );
 }
 
+function DesktopWorkspace({ reference }: { reference: boolean }) {
+  return (
+    <main className="flex min-h-0 flex-1 gap-3 p-3">
+      {reference ? null : (
+        <aside className="scroll-thin hidden w-[268px] shrink-0 overflow-y-auto md:block xl:w-[292px]">
+          <KpiSidebar />
+        </aside>
+      )}
+
+      <section className="relative flex min-w-0 flex-1 flex-col">
+        <CanvasStage />
+      </section>
+
+      {reference ? null : (
+        <aside className="hidden w-[268px] shrink-0 flex-col gap-3 lg:flex xl:w-[292px]">
+          <ThroughputPanel />
+          <div className="min-h-0 flex-1">
+            <ParameterPanel />
+          </div>
+        </aside>
+      )}
+    </main>
+  );
+}
+
 function Workspace() {
   const { demoMode } = useSimulationControls();
   const reference = REFERENCE_MODES.has(demoMode);
+  const tier = useBreakpoint();
 
   return (
     <div
@@ -81,28 +108,7 @@ function Workspace() {
       }}
     >
       <Header />
-
-      <main className="flex min-h-0 flex-1 gap-3 p-3">
-        {reference ? null : (
-          <aside className="scroll-thin hidden w-[268px] shrink-0 overflow-y-auto md:block xl:w-[292px]">
-            <KpiSidebar />
-          </aside>
-        )}
-
-        <section className="relative flex min-w-0 flex-1 flex-col">
-          <CanvasStage />
-        </section>
-
-        {reference ? null : (
-          <aside className="hidden w-[268px] shrink-0 flex-col gap-3 lg:flex xl:w-[292px]">
-            <ThroughputPanel />
-            <div className="min-h-0 flex-1">
-              <ParameterPanel />
-            </div>
-          </aside>
-        )}
-      </main>
-
+      {tier === 'desktop' ? <DesktopWorkspace reference={reference} /> : null}
       <TimelineBar />
     </div>
   );
