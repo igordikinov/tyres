@@ -13,12 +13,13 @@ function tierForWidth(width: number): LayoutTier {
 /**
  * Reports the current layout tier and updates on resize.
  * Mirrors the resize-listener pattern already used by the header; the initial
- * value is read inside the effect so module evaluation never touches `window`
- * (keeps the jsdom smoke render safe). Defaults to 'desktop' before mount so the
- * server/first paint matches the ≥1024 layout.
+ * tier is derived from window.innerWidth when available, falling back to 'desktop'
+ * (keeps the jsdom smoke render safe). Resize listener corrects it after mount.
  */
 export function useBreakpoint(): LayoutTier {
-  const [tier, setTier] = useState<LayoutTier>('desktop');
+  const [tier, setTier] = useState<LayoutTier>(() =>
+    typeof window === 'undefined' ? 'desktop' : tierForWidth(window.innerWidth),
+  );
   useEffect(() => {
     const update = () => setTier(tierForWidth(window.innerWidth));
     update();
