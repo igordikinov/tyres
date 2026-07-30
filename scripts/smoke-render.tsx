@@ -318,6 +318,12 @@ expect(
   container.querySelectorAll('button').length === 0 && container.querySelectorAll('input').length === 0,
   'mobile: native <button>/<input> elements must not appear in the sheet layout',
 );
+press('Закрыть');
+await wait(500);
+expect(
+  container.querySelector('[role="dialog"]') === null,
+  'mobile: the parameters sheet did not close after pressing Закрыть',
+);
 
 root.unmount();
 

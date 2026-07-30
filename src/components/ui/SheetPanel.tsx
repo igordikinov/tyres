@@ -87,7 +87,7 @@ export function SheetPanel({ open, title, onClose, children }: SheetPanelProps) 
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden">
+        <div key="sheet" className="fixed inset-0 z-40 flex flex-col justify-end lg:hidden">
           <Pressable
             label="Закрыть панель"
             onPress={onClose}
