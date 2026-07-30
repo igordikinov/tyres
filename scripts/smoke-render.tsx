@@ -294,6 +294,31 @@ expect(
   'token rim must use the variant colour',
 );
 
+// --- M2: panels reachable on a phone-width viewport (§6.4.1) ---
+press('Онлайн');
+await wait(150);
+Object.defineProperty(dom.window, 'innerWidth', { value: 390, configurable: true, writable: true });
+Object.defineProperty(dom.window, 'innerHeight', { value: 844, configurable: true, writable: true });
+dom.window.dispatchEvent(new dom.window.Event('resize'));
+await wait(150);
+
+expect(
+  container.querySelector('[aria-label="Параметры"]') !== null,
+  'mobile: the «Параметры» toolbar button is missing at 390px',
+);
+press('Параметры');
+await wait(200);
+const paramSheet = container.querySelector('[role="dialog"]');
+expect(paramSheet !== null, 'mobile: the parameters sheet did not open as a role="dialog"');
+expect(
+  container.querySelector('[role="slider"][aria-label="Время смешивания"]') !== null,
+  'mobile: the parameters sheet does not contain a parameter slider',
+);
+expect(
+  container.querySelectorAll('button').length === 0 && container.querySelectorAll('input').length === 0,
+  'mobile: native <button>/<input> elements must not appear in the sheet layout',
+);
+
 root.unmount();
 
 if (failures.length > 0) {

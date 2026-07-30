@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { AnatomyView } from '@/components/anatomy/AnatomyView';
 import { ProductionCanvas } from '@/components/canvas/ProductionCanvas';
 import { KpiSidebar } from '@/components/kpi/KpiSidebar';
@@ -11,6 +12,9 @@ import { ChapterRail } from '@/components/modes/ChapterRail';
 import { CompareView } from '@/components/modes/CompareView';
 import { NarrationBanner } from '@/components/modes/NarrationBanner';
 import { usePresentationDirector } from '@/components/modes/usePresentationDirector';
+import { Pressable } from '@/components/ui/Pressable';
+import { BoltIcon, PresentationChartLineIcon, Squares2X2Icon } from '@/components/ui/icons';
+import { SheetPanel } from '@/components/ui/SheetPanel';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import {
   SimulationProvider,
@@ -23,6 +27,20 @@ const CANVAS_ZONES = ['Смешивание и компоненты', 'Сбор�
 
 /** Tabs that describe the product rather than the running plant. */
 const REFERENCE_MODES = new Set(['anatomy', 'materials']);
+
+type PanelKey = 'kpi' | 'params' | 'chart';
+
+const TOOLBAR: Array<{ key: PanelKey; label: string; icon: typeof BoltIcon }> = [
+  { key: 'kpi', label: 'KPI', icon: Squares2X2Icon },
+  { key: 'params', label: 'Параметры', icon: BoltIcon },
+  { key: 'chart', label: 'График', icon: PresentationChartLineIcon },
+];
+
+const SHEET_TITLES: Record<PanelKey, string> = {
+  kpi: 'KPI цеха',
+  params: 'Параметры',
+  chart: 'Выработка в час',
+};
 
 /** The only part of the layout that reconciles on every animation frame. */
 function CanvasStage() {
@@ -92,6 +110,50 @@ function DesktopWorkspace({ reference }: { reference: boolean }) {
   );
 }
 
+function MobileWorkspace({ reference }: { reference: boolean }) {
+  const [openPanel, setOpenPanel] = useState<PanelKey | null>(null);
+
+  return (
+    <>
+      <main className="relative flex min-h-0 flex-1 flex-col p-3">
+        <section className="relative flex min-w-0 flex-1 flex-col">
+          <CanvasStage />
+        </section>
+      </main>
+
+      {reference ? null : (
+        <nav
+          aria-label="Панели"
+          className="flex shrink-0 items-stretch gap-2 border-t border-line bg-surface px-3 py-2"
+        >
+          {TOOLBAR.map(({ key, label, icon: Icon }) => (
+            <Pressable
+              key={key}
+              label={label}
+              pressed={openPanel === key}
+              onPress={() => setOpenPanel(key)}
+              className="h-11 flex-1 gap-2 rounded-xl text-[12px] font-semibold text-ink-700"
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Pressable>
+          ))}
+        </nav>
+      )}
+
+      <SheetPanel
+        open={openPanel !== null}
+        title={openPanel ? SHEET_TITLES[openPanel] : ''}
+        onClose={() => setOpenPanel(null)}
+      >
+        {openPanel === 'kpi' ? <KpiSidebar /> : null}
+        {openPanel === 'params' ? <ParameterPanel /> : null}
+        {openPanel === 'chart' ? <ThroughputPanel /> : null}
+      </SheetPanel>
+    </>
+  );
+}
+
 function Workspace() {
   const { demoMode } = useSimulationControls();
   const reference = REFERENCE_MODES.has(demoMode);
@@ -108,7 +170,11 @@ function Workspace() {
       }}
     >
       <Header />
-      {tier === 'desktop' ? <DesktopWorkspace reference={reference} /> : null}
+      {tier === 'desktop' ? (
+        <DesktopWorkspace reference={reference} />
+      ) : (
+        <MobileWorkspace reference={reference} />
+      )}
       <TimelineBar />
     </div>
   );
